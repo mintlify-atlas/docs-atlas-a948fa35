@@ -1,0 +1,143 @@
+---
+title: 'Register User'
+api: 'POST /auth/register'
+description: 'Register a new user in the Tesis Rutas platform'
+---
+
+Register a new user with name, email, and password. The user is automatically assigned the "visitante" (visitor) role by default.
+
+## Request Body
+
+<ParamField body="nombre" type="string" required>
+  Full name of the user
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Valid email address. Must be unique in the system.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  User password. Will be securely hashed using bcrypt before storage.
+</ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Confirmation message indicating successful registration
+</ResponseField>
+
+<ResponseField name="usuario" type="object">
+  User information object
+  
+  <ResponseField name="usuario.id" type="string">
+    Unique identifier for the created user
+  </ResponseField>
+  
+  <ResponseField name="usuario.nombre" type="string">
+    User's full name
+  </ResponseField>
+  
+  <ResponseField name="usuario.email" type="string">
+    User's email address
+  </ResponseField>
+  
+  <ResponseField name="usuario.rol" type="string">
+    User's role. Default is "visitante". Possible values: "visitante", "editor", "admin"
+  </ResponseField>
+</ResponseField>
+
+## Example Request
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.tesisrutas.com/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "María González",
+    "email": "maria@example.com",
+    "password": "securePassword123"
+  }'
+```
+
+```python Python
+import requests
+
+url = "https://api.tesisrutas.com/auth/register"
+payload = {
+    "nombre": "María González",
+    "email": "maria@example.com",
+    "password": "securePassword123"
+}
+
+response = requests.post(url, json=payload)
+print(response.json())
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.tesisrutas.com/auth/register', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    nombre: 'María González',
+    email: 'maria@example.com',
+    password: 'securePassword123'
+  })
+});
+
+const data = await response.json();
+console.log(data);
+```
+
+</CodeGroup>
+
+## Example Response
+
+```json
+{
+  "message": "Usuario registrado correctamente.",
+  "usuario": {
+    "id": "507f1f77bcf86cd799439011",
+    "nombre": "María González",
+    "email": "maria@example.com",
+    "rol": "visitante"
+  }
+}
+```
+
+## Error Responses
+
+<ResponseField name="400 Bad Request" type="error">
+  Returned when validation fails or the email is already registered
+
+  ```json
+  {
+    "detail": "El email ya está registrado."
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="422 Unprocessable Entity" type="error">
+  Returned when request body is invalid or missing required fields
+
+  ```json
+  {
+    "detail": [
+      {
+        "loc": ["body", "email"],
+        "msg": "value is not a valid email address",
+        "type": "value_error.email"
+      }
+    ]
+  }
+  ```
+</ResponseField>
+
+## Notes
+
+- Passwords are hashed using bcrypt before being stored in the database
+- All new users receive the "visitante" role by default
+- Email addresses must be unique across the system
+- The user ID is automatically generated upon creation

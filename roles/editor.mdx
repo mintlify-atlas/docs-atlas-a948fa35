@@ -1,0 +1,292 @@
+---
+title: Editor Role
+description: Content creation and destination management capabilities for editors
+---
+
+## Overview
+
+The **Editor** role is designed for content creators who manage tourist routes and destination visibility. Editors can create, update, and delete routes, as well as toggle destination active/inactive status.
+
+<Note>
+The editor role is identified as `"editor"` in the database and code.
+</Note>
+
+## Core Capabilities
+
+Editors have access to two primary domains:
+
+<CardGroup cols={2}>
+  <Card title="Route Management" icon="route">
+    Full CRUD operations on tourist routes
+  </Card>
+  <Card title="Destination Status" icon="toggle-on">
+    Enable or disable destination visibility
+  </Card>
+</CardGroup>
+
+## Route Management
+
+Editors have complete control over tourist routes:
+
+### Create Routes
+
+Editors can create new tourist routes with multiple POIs:
+
+```python
+@router.post("/crear", summary="Crear una nueva ruta turística")
+def crear_ruta(
+    data: dict, 
+    repo: RutaTuristicaRepositoryImpl = Depends(get_repository), 
+    destino_repo = Depends(get_destino_repository), 
+    editor = Depends(require_editor)
+):
+    use_case = CrearRutaTuristicaUseCase(repo, destino_repo)
+    
+    nombre = data["nombre"]
+    descripcion = data.get("descripcion", "")
+    categoria = data.get("categoria", "")
+    pois = data.get("pois", [])
+    punto_inicio_id = pois[0]["poi_id"] if pois else None
+    poi_ids = [p["poi_id"] for p in pois]
+    
+    ruta_id = use_case.execute(nombre, descripcion, categoria, punto_inicio_id, poi_ids)
+    
+    return {"ruta_id": ruta_id}
+```
+
+**Endpoint:** `POST /rutas/crear`  
+**Source:** `src/infrastructure/api/routers/rutas_router.py:30-44`
+
+**Required Fields:**
+- `nombre` (string): Route name
+- `pois` (array): List of POI objects with `poi_id`
+
+**Optional Fields:**
+- `descripcion` (string): Route description
+- `categoria` (string): Route category
+
+### Update Routes
+
+Editors can modify existing routes:
+
+```python
+@router.put("/{ruta_id}", summary="Actualizar una ruta turística")
+def actualizar_ruta(
+    ruta_id: str, 
+    data: dict, 
+    repo: RutaTuristicaRepositoryImpl = Depends(get_repository), 
+    editor = Depends(require_editor)
+):
+    use_case = ActualizarRutaTuristicaUseCase(repo)
+    
+    puntos = [
+        RutaPOI(
+            poi_id=p["poi_id"],
+            order=p.get("order", idx)
+        )
+        for idx, p in enumerate(data.get("pois", []))
+    ]
+    
+    ruta_actualizada = RutaTuristica(
+        nombre=data["nombre"],
+        descripcion=data.get("descripcion", ""),
+        categoria=data.get("categoria", ""),
+        puntos=puntos
+    )
+    
+    ok = use_case.execute(ruta_id, ruta_actualizada)
+    
+    return {"mensaje": "Ruta actualizada correctamente"}
+```
+
+**Endpoint:** `PUT /rutas/{ruta_id}`  
+**Source:** `src/infrastructure/api/routers/rutas_router.py:104-129`
+
+### Delete Routes
+
+Editors can remove routes from the system:
+
+```python
+@router.delete("/{ruta_id}", summary="Eliminar ruta turística")
+def eliminar_ruta(
+    ruta_id: str, 
+    repo: RutaTuristicaRepositoryImpl = Depends(get_repository), 
+    editor = Depends(require_editor)
+):
+    use_case = EliminarRutaTuristica(repo)
+    ok = use_case.execute(ruta_id)
+    
+    if not ok:
+        raise HTTPException(status_code=404, detail="Ruta no encontrada o no eliminada")
+    
+    return {"mensaje": "Ruta eliminada correctamente"}
+```
+
+**Endpoint:** `DELETE /rutas/{ruta_id}`  
+**Source:** `src/infrastructure/api/routers/rutas_router.py:76-85`
+
+## Destination Status Management
+
+Editors can toggle destination visibility without full editing permissions:
+
+### Toggle Destination Status
+
+```python
+@router.put("/estado/{id}")
+def cambiar_estado_destino(
+    id: str, 
+    db=Depends(get_database), 
+    editor = Depends(require_editor)
+):
+    repo = DestinoRepositoryImpl(db)
+    use_case = CambiarEstadoDestinoUseCase(repo)
+    mensaje = use_case.ejecutar(id)
+    return {"message": mensaje}
+```
+
+**Endpoint:** `PUT /destinos/estado/{id}`  
+**Source:** `src/infrastructure/api/routers/destinos_router.py:46-54`
+
+<Note>
+This endpoint toggles the destination's active status. If active, it becomes inactive, and vice versa.
+</Note>
+
+## Read-Only Permissions
+
+Editors can view (but not create, edit, or delete) destinations:
+
+### Browse Destinations
+
+```python
+@router.get("/")
+def listar_destinos(db=Depends(get_database)):
+    repo = DestinoRepositoryImpl(db)
+    destinos = repo.obtener_todos()
+    return {"total": len(destinos), "data": destinos}
+```
+
+**Endpoint:** `GET /destinos/`  
+**Source:** `src/infrastructure/api/routers/destinos_router.py:30-34`
+
+<Warning>
+Editors **cannot** create, edit, or delete destinations. These operations require administrator privileges.
+</Warning>
+
+### View Routes
+
+Editors can view all routes and route details:
+
+```python
+@router.get("/", summary="Listar todas las rutas turísticas")
+def listar_rutas(repo: RutaTuristicaRepositoryImpl = Depends(get_repository)):
+    use_case = ListarRutasTuristicas(repo)
+    rutas = use_case.execute()
+    return rutas
+
+@router.get("/{ruta_id}", summary="Obtener una ruta turística por ID")
+def obtener_ruta(ruta_id: str, repo: RutaTuristicaRepositoryImpl = Depends(get_repository)):
+    use_case = ObtenerRutaTuristica(repo)
+    ruta = use_case.execute(ruta_id)
+    return ruta
+```
+
+**Endpoints:**
+- `GET /rutas/` - List all routes
+- `GET /rutas/{ruta_id}` - Get route details
+
+**Source:** `src/infrastructure/api/routers/rutas_router.py:50-70`
+
+## Inherited Visitor Permissions
+
+Editors inherit all visitor capabilities:
+
+<CardGroup cols={2}>
+  <Card title="Favorites" icon="heart">
+    Add and remove favorite destinations
+  </Card>
+  <Card title="Tracking" icon="location-dot">
+    Register visited POIs and completed routes
+  </Card>
+  <Card title="Profile" icon="user">
+    View and update personal profile
+  </Card>
+  <Card title="AI Features" icon="wand-magic-sparkles">
+    Generate routes and get POI suggestions
+  </Card>
+</CardGroup>
+
+See the [Visitor Role](/roles/visitor) documentation for details on these features.
+
+## Permission Enforcement
+
+The `require_editor` dependency ensures only editors and administrators can access protected endpoints:
+
+```python
+def require_editor(request: Request):
+    """
+    Puede editar contenido.
+    """
+    return _require_role(request, ["editor", "administrador"])
+```
+
+**Source:** `src/infrastructure/security/jwt_utils.py:95-99`
+
+<Note>
+Administrators automatically have all editor permissions through role inheritance.
+</Note>
+
+## Editor-Only Endpoints
+
+The following endpoints require editor or administrator privileges:
+
+| Endpoint | Method | Purpose |
+|----------|--------|----------|
+| `/rutas/crear` | POST | Create new route |
+| `/rutas/{ruta_id}` | PUT | Update route |
+| `/rutas/{ruta_id}` | DELETE | Delete route |
+| `/destinos/estado/{id}` | PUT | Toggle destination status |
+
+## Prohibited Operations
+
+Editors **cannot** perform the following operations (admin-only):
+
+<Warning>
+**Admin-Only Operations:**
+- Create, edit, or delete destinations
+- Upload or delete multimedia files
+- Manage user accounts
+- Assign user roles
+- View all users
+</Warning>
+
+## Common Workflows
+
+### Creating a Complete Route
+
+1. Browse available destinations via `GET /destinos/`
+2. Identify POIs to include in the route
+3. Create the route via `POST /rutas/crear` with POI IDs
+4. Optionally update the route via `PUT /rutas/{ruta_id}`
+
+### Managing Destination Visibility
+
+1. Identify destination via `GET /destinos/`
+2. Toggle status via `PUT /destinos/estado/{id}`
+3. Verify change by checking destination list
+
+## Best Practices
+
+<Note>
+**Route Creation Tips:**
+- Use descriptive names and detailed descriptions
+- Order POIs logically for optimal visitor experience
+- Assign appropriate categories for filtering
+- Test routes by viewing them as a visitor
+</Note>
+
+## Related Documentation
+
+- [User Roles Overview](/roles/overview)
+- [Administrator Role](/roles/admin)
+- [Visitor Role](/roles/visitor)
+- [Routes API Reference](/api/routes/create)

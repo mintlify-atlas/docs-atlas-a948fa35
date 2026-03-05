@@ -1,0 +1,281 @@
+---
+title: Administrator Role
+description: Full platform access for managing users, destinations, routes, and multimedia
+---
+
+## Overview
+
+The **Administrador** (Administrator) role has unrestricted access to all platform features. Administrators can manage users, create and modify destinations, upload multimedia content, and perform all operations available to editors and visitors.
+
+<Note>
+The administrator role is identified as `"administrador"` in the database and code.
+</Note>
+
+## Core Capabilities
+
+### User Management
+
+Administrators have complete control over user accounts:
+
+<CardGroup cols={2}>
+  <Card title="View All Users" icon="users">
+    List and view details of all registered users
+  </Card>
+  <Card title="Assign Roles" icon="user-tag">
+    Change user roles between visitante, editor, and administrador
+  </Card>
+  <Card title="Delete Users" icon="user-minus">
+    Permanently remove user accounts from the system
+  </Card>
+  <Card title="View Any Profile" icon="address-card">
+    Access any user's profile information
+  </Card>
+</CardGroup>
+
+#### List All Users
+
+```python
+@router.get("/listar", dependencies=[Depends(require_admin)])
+def listar_usuarios(db=Depends(get_database)):
+    repo = UsuarioRepositoryImpl(db)
+    uc = ListarUsuarios(repo)
+    return [u.__dict__ for u in uc.ejecutar()]
+```
+
+**Endpoint:** `GET /usuarios/listar`  
+**Source:** `src/infrastructure/api/routers/usuario_router.py:83-87`
+
+#### Assign User Roles
+
+```python
+@router.patch("/{user_id}/rol", dependencies=[Depends(require_admin)])
+def asignar_rol(user_id: str, data: dict, db=Depends(get_database)):
+    nuevo_rol = data.get("rol")
+    repo = UsuarioRepositoryImpl(db)
+    use_case = AsignarRol(repo)
+    usuario = use_case.ejecutar(user_id, nuevo_rol)
+    return {"message": "Rol actualizado correctamente", "nuevo_rol": usuario.rol}
+```
+
+**Endpoint:** `PATCH /usuarios/{user_id}/rol`  
+**Source:** `src/infrastructure/api/routers/usuario_router.py:202-220`
+
+<Warning>
+Role changes take effect immediately. Ensure you understand the implications before modifying user roles.
+</Warning>
+
+#### Delete Users
+
+```python
+@router.delete("/borrar/{user_id}", dependencies=[Depends(require_admin)])
+def eliminar_usuario(user_id: str, db=Depends(get_database)):
+    repo = UsuarioRepositoryImpl(db)
+    uc = EliminarUsuario(repo)
+    usuario = uc.ejecutar(user_id)
+    return {"message": "Usuario eliminado", "usuario": usuario.__dict__}
+```
+
+**Endpoint:** `DELETE /usuarios/borrar/{user_id}`  
+**Source:** `src/infrastructure/api/routers/usuario_router.py:104-114`
+
+### Destination Management
+
+Administrators have full CRUD access to destinations:
+
+#### Create Destinations
+
+```python
+@router.post("/")
+def crear_destino(data: dict, db=Depends(get_database), admin = Depends(require_admin)):
+    repo = DestinoRepositoryImpl(db)
+    use_case = AgregarDestinoUseCase(repo)
+    destino_id = use_case.ejecutar(data)
+    return {"message": "Destino creado correctamente", "id": destino_id}
+```
+
+**Endpoint:** `POST /destinos/`  
+**Source:** `src/infrastructure/api/routers/destinos_router.py:20-28`
+
+#### Edit Destinations
+
+```python
+@router.put("/{id}")
+def editar_destino(id: str, data: dict, db=Depends(get_database), admin = Depends(require_admin)):
+    repo = DestinoRepositoryImpl(db)
+    use_case = EditarDestinoUseCase(repo)
+    use_case.ejecutar(id, data)
+    return {"message": "Destino actualizado correctamente"}
+```
+
+**Endpoint:** `PUT /destinos/{id}`  
+**Source:** `src/infrastructure/api/routers/destinos_router.py:36-44`
+
+#### Delete Destinations
+
+Administrators can permanently delete destinations after removing all multimedia:
+
+```python
+@router.delete("/{destino_id}/force")
+def eliminar_destino_fisico(destino_id: str, db=Depends(get_database), admin = Depends(require_admin)):
+    repo = DestinoRepositoryImpl(db)
+    destino = repo.obtener_por_id(destino_id)
+    
+    # Validate no multimedia attached
+    multimedia_actual = destino.get("multimedia", [])
+    if multimedia_actual:
+        raise HTTPException(
+            status_code=400,
+            detail="Este destino tiene archivos multimedia. Elimínelos primero."
+        )
+    
+    # Delete from database and Cloudinary
+    use_case = EliminarDestinoUseCase(repo)
+    eliminado = use_case.eliminar_fisico(destino_id)
+    cloudinary.api.delete_folder(f"destinations/{destino_id}")
+```
+
+**Endpoint:** `DELETE /destinos/{destino_id}/force`  
+**Source:** `src/infrastructure/api/routers/destinos_router.py:56-91`
+
+<Warning>
+Destinations must have all multimedia removed before deletion. The system enforces this validation.
+</Warning>
+
+### Multimedia Management
+
+Administrators control multimedia uploads to Cloudinary:
+
+#### Upload Multimedia
+
+```python
+@router.post("/{id}/multimedia")
+async def subir_multimedia_destino(
+    id: str,
+    files: List[UploadFile] = File(...),
+    db=Depends(get_database), admin = Depends(require_admin)
+):
+    # Validates 1-3 files per request
+    # Maximum 10 files per destination
+    # Uploads to cloudinary.com/destinations/{id}/
+```
+
+**Endpoint:** `POST /destinos/{id}/multimedia`  
+**Source:** `src/infrastructure/api/routers/destinos_router.py:96-201`
+
+**Constraints:**
+- 1-3 files per request
+- Maximum 10 files per destination
+- Supports images and videos
+- Automatic Cloudinary organization
+
+#### Delete Multimedia
+
+```python
+@router.delete("/{id}/multimedia")
+async def eliminar_multimedia_destino(
+    id: str,
+    public_id: str,
+    db=Depends(get_database), admin = Depends(require_admin)
+):
+    # Removes from both MongoDB and Cloudinary
+    use_case = EliminarMultimediaDestinoUseCase(repo)
+    eliminado_db = await use_case.execute(id, public_id)
+    cloudinary.uploader.destroy(public_id, resource_type=tipo_cloudinary)
+```
+
+**Endpoint:** `DELETE /destinos/{id}/multimedia?public_id={public_id}`  
+**Source:** `src/infrastructure/api/routers/destinos_router.py:205-254`
+
+### Route Management
+
+Administrators inherit all editor permissions for route management. See the [Editor Role](/roles/editor) documentation for route operations.
+
+### Self-Management Privileges
+
+Administrators can update any user profile, including their own:
+
+```python
+@router.put("/actualizar/{user_id}")
+def actualizar_usuario(user_id: str, data: dict, token_data = Depends(get_current_user)):
+    # Admin can update any user
+    if token_data.id != user_id and token_data.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos")
+    
+    # Admin can change roles
+    if token_data.rol == "admin":
+        rol = data.get("rol")
+```
+
+**Endpoint:** `PUT /usuarios/actualizar/{user_id}`  
+**Source:** `src/infrastructure/api/routers/usuario_router.py:34-78`
+
+## Permission Enforcement
+
+The `require_admin` dependency ensures only administrators can access protected endpoints:
+
+```python
+def require_admin(request: Request):
+    """
+    Acceso total.
+    """
+    return _require_role(request, ["administrador"])
+```
+
+**Source:** `src/infrastructure/security/jwt_utils.py:102-106`
+
+### Usage Example
+
+```python
+@router.delete("/borrar/{user_id}", dependencies=[Depends(require_admin)])
+def eliminar_usuario(user_id: str, db=Depends(get_database)):
+    # Only administrators can execute this endpoint
+```
+
+## Admin-Only Endpoints
+
+The following endpoints require administrator privileges:
+
+| Endpoint | Method | Purpose |
+|----------|--------|----------|
+| `/usuarios/listar` | GET | List all users |
+| `/usuarios/borrar/{user_id}` | DELETE | Delete user account |
+| `/usuarios/{user_id}/rol` | PATCH | Assign user role |
+| `/destinos/` | POST | Create destination |
+| `/destinos/{id}` | PUT | Update destination |
+| `/destinos/{destino_id}/force` | DELETE | Delete destination |
+| `/destinos/{id}/multimedia` | POST | Upload multimedia |
+| `/destinos/{id}/multimedia` | DELETE | Delete multimedia |
+
+## Inherited Permissions
+
+Administrators automatically inherit all permissions from:
+
+<CardGroup cols={2}>
+  <Card title="Editor Permissions" icon="pen-to-square" href="/roles/editor">
+    Route creation, updates, and status management
+  </Card>
+  <Card title="Visitor Permissions" icon="user" href="/roles/visitor">
+    Browsing, favorites, and tracking features
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Warning>
+**Security Considerations:**
+- Limit the number of administrator accounts
+- Regularly audit admin actions
+- Use role assignment carefully
+- Ensure multimedia is removed before deleting destinations
+</Warning>
+
+<Note>
+Administrators should use the visitor and editor interfaces for routine tasks to minimize the risk of accidental modifications.
+</Note>
+
+## Related Documentation
+
+- [User Roles Overview](/roles/overview)
+- [Editor Role](/roles/editor)
+- [Visitor Role](/roles/visitor)
+- [Authentication](/api/auth/register)

@@ -1,0 +1,242 @@
+---
+title: 'Destination Management'
+description: 'Manage heritage sites and points of interest with comprehensive data and multimedia support'
+icon: 'map-pin'
+---
+
+## Overview
+
+Destinations (POIs) are the core entities of Tesis Rutas. Each destination represents a heritage site or tourist point of interest with rich metadata, geographic coordinates, and multimedia assets.
+
+<Note>
+  Each destination can store up to **10 multimedia files** (images or videos) via Cloudinary integration.
+</Note>
+
+## Data Model
+
+The `Destino` entity is defined in `src/domain/entities/destino.py` with the following structure:
+
+### Required Fields
+
+<CodeGroup>
+```python Entity Structure
+class Destino:
+    def __init__(
+        self,
+        nombre: str,
+        ubicacion: str,
+        importancia: str,
+        coordenadas: Coordenadas,
+        anio_construccion: list[int],
+        arquitecto: Optional[str] = None,
+        area_construccion: Optional[float] = None,
+        funcion: Optional[str] = None,
+        multimedia: Optional[list[dict]] = None,
+        id: Optional[str] = None,
+        fecha_creacion: Optional[datetime] = None,
+        activo: bool = True
+    )
+```
+
+```python Coordenadas Value Object
+@dataclass(frozen=True)
+class Coordenadas:
+    latitud: float   # Range: -90 to 90
+    longitud: float  # Range: -180 to 180
+    
+    def to_dict(self) -> dict:
+        return {
+            "latitud": self.latitud,
+            "longitud": self.longitud
+        }
+```
+</CodeGroup>
+
+### Field Descriptions
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `nombre` | `str` | Yes | Name of the heritage site |
+| `ubicacion` | `str` | Yes | Location description |
+| `importancia` | `str` | Yes | Historical/cultural importance |
+| `coordenadas` | `Coordenadas` | Yes | GPS coordinates (validated) |
+| `anio_construccion` | `list[int]` | Yes | 1-2 values: [year] or [start_year, end_year] |
+| `arquitecto` | `str` | No | Name of the architect |
+| `area_construccion` | `float` | No | Construction area in m² |
+| `funcion` | `str` | No | Original function/purpose |
+| `multimedia` | `list[dict]` | No | Array of multimedia objects (max 10) |
+| `activo` | `bool` | Yes | Active status (default: true) |
+
+<Accordion title="Validation Rules">
+  - **Coordinates**: Automatically validated by the `Coordenadas` value object
+    - Latitude: -90° to 90°
+    - Longitude: -180° to 180°
+  - **Construction Year**: Must contain exactly 1 or 2 integers
+  - **Multimedia**: Maximum 10 files per destination
+  - **Strings**: `nombre`, `ubicacion`, `importancia` are automatically stripped of whitespace
+</Accordion>
+
+## API Endpoints
+
+All destination endpoints are defined in `src/infrastructure/api/routers/destinos_router.py`:
+
+<Steps>
+  <Step title="Create Destination">
+    **POST** `/destinos/`
+    
+    Requires: Admin role
+    
+    ```python Use Case
+    use_case = AgregarDestinoUseCase(repo)
+    destino_id = use_case.ejecutar(data)
+    ```
+    
+    **Request Body:**
+    ```json
+    {
+      "nombre": "Catedral de Lima",
+      "ubicacion": "Plaza Mayor, Lima",
+      "importancia": "Patrimonio Cultural de la Nación",
+      "coordenadas": {
+        "latitud": -12.046374,
+        "longitud": -77.028236
+      },
+      "anio_construccion": [1535, 1649],
+      "arquitecto": "Francisco Becerra",
+      "area_construccion": 2500.0,
+      "funcion": "Templo religioso"
+    }
+    ```
+  </Step>
+  
+  <Step title="List All Destinations">
+    **GET** `/destinos/`
+    
+    Public endpoint - no authentication required
+    
+    ```python Response
+    {
+      "total": 15,
+      "data": [
+        {
+          "_id": "507f1f77bcf86cd799439011",
+          "nombre": "Catedral de Lima",
+          "ubicacion": "Plaza Mayor",
+          "coordenadas": {"latitud": -12.046374, "longitud": -77.028236},
+          "multimedia": [...],
+          "activo": true
+        }
+      ]
+    }
+    ```
+  </Step>
+  
+  <Step title="Update Destination">
+    **PUT** `/destinos/{id}`
+    
+    Requires: Admin role
+    
+    Updates any editable field while preserving existing data.
+  </Step>
+  
+  <Step title="Toggle Active Status">
+    **PUT** `/destinos/estado/{id}`
+    
+    Requires: Editor role
+    
+    Soft delete/restore functionality - toggles the `activo` boolean.
+  </Step>
+  
+  <Step title="Permanent Delete">
+    **DELETE** `/destinos/{destino_id}/force`
+    
+    Requires: Admin role
+    
+    <Warning>
+      Physical deletion from database. Destination **must have zero multimedia files** before deletion. Automatically removes the Cloudinary folder.
+    </Warning>
+    
+    ```python Validation Logic
+    multimedia_actual = destino.get("multimedia", [])
+    if multimedia_actual:
+        raise HTTPException(
+            status_code=400,
+            detail="Este destino tiene archivos multimedia. Elimínelos primero."
+        )
+    ```
+  </Step>
+</Steps>
+
+## Creating Destinations
+
+The `AgregarDestinoUseCase` (src/application/use_cases/agregar_destino.py) handles destination creation:
+
+```python Use Case Implementation
+class AgregarDestinoUseCase:
+    def ejecutar(self, data: dict) -> str:
+        coordenadas = Coordenadas(
+            latitud=data["coordenadas"]["latitud"],
+            longitud=data["coordenadas"]["longitud"]
+        )
+
+        destino = Destino(
+            nombre=data["nombre"],
+            ubicacion=data["ubicacion"],
+            importancia=data["importancia"],
+            coordenadas=coordenadas,
+            anio_construccion=data["anio_construccion"],
+            arquitecto=data.get("arquitecto"),
+            area_construccion=data.get("area_construccion"),
+            funcion=data.get("funcion")
+        )
+
+        return self.repository.crear_destino(destino)
+```
+
+## Database Storage
+
+Destinations are stored in MongoDB with the following structure:
+
+```python MongoDB Document
+def to_dict(self) -> dict:
+    return {
+        "_id": self.id,
+        "nombre": self.nombre,
+        "ubicacion": self.ubicacion,
+        "importancia": self.importancia,
+        "anio_construccion": self.anio_construccion,
+        "arquitecto": self.arquitecto,
+        "area_construccion": self.area_construccion,
+        "funcion": self.funcion,
+        "coordenadas": self.coordenadas.to_dict(),
+        "multimedia": self.multimedia,
+        "fecha_creacion": self.fecha_creacion,
+        "activo": self.activo
+    }
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Coordinate Precision" icon="location-dot">
+    Use at least 6 decimal places for accurate GPS positioning (±11 cm accuracy)
+  </Card>
+  
+  <Card title="Construction Years" icon="calendar">
+    Use single value `[1850]` for completed structures, two values `[1850, 1865]` for construction periods
+  </Card>
+  
+  <Card title="Soft Deletion" icon="trash-arrow-up">
+    Always use `activo` flag for deletion to preserve historical data and route references
+  </Card>
+  
+  <Card title="Multimedia Limits" icon="images">
+    Plan multimedia usage carefully - 10 file limit per destination enforced at API level
+  </Card>
+</CardGroup>
+
+## Related Features
+
+- [Multimedia Management](/features/multimedia) - Upload and manage destination media
+- [Tourist Routes](/features/routes) - Include destinations in routes
+- [Route Generation](/features/route-generation) - AI-powered route creation from destinations

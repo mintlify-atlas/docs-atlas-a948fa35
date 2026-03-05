@@ -1,0 +1,151 @@
+---
+title: 'Delete Destination'
+api: 'DELETE /destinos/{destino_id}/force'
+description: 'Permanently delete a heritage site from the database and Cloudinary'
+---
+
+## Authentication
+
+**Required Role:** Admin
+
+This endpoint requires authentication with admin privileges. This is a destructive operation that cannot be undone.
+
+<ParamField path="destino_id" type="string" required>
+  MongoDB ObjectId of the destination to delete
+</ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Success message confirming deletion
+</ResponseField>
+
+<ResponseField name="cloudinary_error" type="string">
+  Error message if Cloudinary folder deletion failed (optional)
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X DELETE https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011/force \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+```
+
+```python Python
+import requests
+
+url = "https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011/force"
+headers = {
+    "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+}
+
+response = requests.delete(url, headers=headers)
+print(response.json())
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011/force',
+  {
+    method: 'DELETE',
+    headers: {
+      'Authorization': 'Bearer YOUR_ADMIN_TOKEN'
+    }
+  }
+);
+
+const data = await response.json();
+console.log(data);
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "message": "Destino con id 507f1f77bcf86cd799439011 eliminado permanentemente y carpeta Cloudinary eliminada."
+}
+```
+
+```json Partial Success
+{
+  "message": "Destino eliminado de la base de datos, pero hubo un error al borrar la carpeta en Cloudinary.",
+  "cloudinary_error": "Folder not found"
+}
+```
+
+```json Error: Has Multimedia
+{
+  "detail": "Este destino tiene archivos multimedia. Elimínelos primero antes de eliminar el destino."
+}
+```
+
+```json Error: Not Found
+{
+  "detail": "Destino no encontrado"
+}
+```
+
+</ResponseExample>
+
+## Deletion Process
+
+This endpoint performs a complete physical deletion in the following steps:
+
+### 1. Validation
+- Verifies the destination exists in the database
+- **Checks for associated multimedia files**
+- Returns 400 error if multimedia files exist
+
+### 2. Database Deletion
+- Permanently removes the document from MongoDB
+- Uses `delete_one()` operation (not a soft delete)
+- Cannot be recovered after deletion
+
+### 3. Cloudinary Cleanup
+- Attempts to delete the folder: `destinations/{destino_id}`
+- This removes all uploaded files for this destination
+- If Cloudinary deletion fails, the database deletion still succeeds
+
+## Important Notes
+
+<Warning>
+  **Multimedia Must Be Deleted First**
+  
+  You cannot delete a destination that has associated multimedia files. Use the [DELETE /destinos/{id}/multimedia](/api/destinations/multimedia#delete-multimedia) endpoint to remove all files first.
+</Warning>
+
+<Info>
+  **Soft Delete Alternative**
+  
+  Consider using [PUT /destinos/estado/{id}](/api/destinations/update#toggle-destination-status) to deactivate a destination instead of permanent deletion. This preserves data and allows reactivation later.
+</Info>
+
+### Why This Constraint?
+
+The multimedia validation ensures:
+- **No orphaned files** in Cloudinary
+- **Explicit cleanup workflow** - admins must consciously delete files first
+- **Data integrity** - prevents accidental loss of multimedia assets
+
+## Implementation Details
+
+This endpoint:
+1. Retrieves the destination document
+2. Checks `multimedia` array length
+3. Blocks deletion if `multimedia.length > 0`
+4. Uses `EliminarDestinoUseCase.eliminar_fisico()` for database deletion
+5. Calls `cloudinary.api.delete_folder()` to remove all files
+6. Returns graceful error if Cloudinary cleanup fails
+
+**Cloudinary Folder Structure:**
+```
+destinations/
+  └── {destino_id}/
+      ├── image1.jpg
+      ├── image2.png
+      └── video1.mp4
+```
+
+**Source:** `destinos_router.py:56-91`

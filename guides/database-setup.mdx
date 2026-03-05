@@ -1,0 +1,418 @@
+---
+title: 'Database Setup'
+description: 'Configure MongoDB for local development or MongoDB Atlas'
+icon: 'database'
+---
+
+## Overview
+
+Tesis Rutas uses **MongoDB** as its database. You can use either a local MongoDB installation or **MongoDB Atlas** (cloud-hosted).
+
+## Option 1: Local MongoDB
+
+### Installation
+
+<Tabs>
+  <Tab title="Ubuntu/Debian">
+    ```bash
+    # Import MongoDB public key
+    wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | sudo apt-key add -
+
+    # Add repository
+    echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+
+    # Install
+    sudo apt update
+    sudo apt install -y mongodb-org
+
+    # Start MongoDB
+    sudo systemctl start mongod
+    sudo systemctl enable mongod
+    ```
+  </Tab>
+
+  <Tab title="macOS">
+    ```bash
+    # Using Homebrew
+    brew tap mongodb/brew
+    brew install mongodb-community@7.0
+
+    # Start MongoDB
+    brew services start mongodb-community@7.0
+    ```
+  </Tab>
+
+  <Tab title="Windows">
+    1. Download MongoDB Community Server from [mongodb.com/download-center/community](https://www.mongodb.com/download-center/community)
+    2. Run the installer (MSI)
+    3. Install as a Windows Service
+    4. MongoDB will start automatically
+  </Tab>
+
+  <Tab title="Docker">
+    ```bash
+    # Run MongoDB in Docker
+    docker run -d \
+      --name mongodb \
+      -p 27017:27017 \
+      -v mongodb_data:/data/db \
+      mongo:7.0
+
+    # Verify it's running
+    docker ps
+    ```
+  </Tab>
+</Tabs>
+
+### Verify Installation
+
+```bash
+# Connect to MongoDB shell
+mongosh
+
+# You should see:
+# Current Mongosh Log ID: ...
+# Connecting to: mongodb://127.0.0.1:27017/
+# Using MongoDB: 7.0.x
+```
+
+### Configuration
+
+Update `src/config/local_config.json`:
+
+```json
+{
+  "MONGO_URI": "mongodb://localhost:27017",
+  "MONGO_DB": "turismo_digital_uce"
+}
+```
+
+## Option 2: MongoDB Atlas (Cloud)
+
+<Steps>
+  <Step title="Create MongoDB Atlas account">
+    1. Go to [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
+    2. Sign up for a free account
+    3. Create a new cluster (M0 Free tier is sufficient for development)
+  </Step>
+
+  <Step title="Configure network access">
+    1. In Atlas dashboard, go to **Network Access**
+    2. Click **Add IP Address**
+    3. For development, choose **Allow Access from Anywhere** (0.0.0.0/0)
+    
+    <Warning>
+      In production, restrict access to specific IP addresses.
+    </Warning>
+  </Step>
+
+  <Step title="Create database user">
+    1. Go to **Database Access**
+    2. Click **Add New Database User**
+    3. Choose **Password** authentication
+    4. Set username and password
+    5. Grant **Read and Write** permissions
+  </Step>
+
+  <Step title="Get connection string">
+    1. Go to **Database** → **Connect**
+    2. Choose **Connect your application**
+    3. Copy the connection string:
+    
+    ```
+    mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority
+    ```
+  </Step>
+
+  <Step title="Update configuration">
+    Add to `src/config/local_config.json`:
+
+    ```json
+    {
+      "MONGO_URI": "mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority",
+      "MONGO_DB": "turismo_digital_uce"
+    }
+    ```
+
+    Replace `username` and `password` with your database user credentials.
+  </Step>
+</Steps>
+
+## Database Schema
+
+The application uses the following collections:
+
+### destinos (Destinations)
+
+Stores tourist destinations and points of interest.
+
+```json
+{
+  "_id": "ObjectId",
+  "nombre": "Basílica del Voto Nacional",
+  "ubicacion": "Centro Histórico de Quito",
+  "importancia": "Patrimonio religioso y arquitectónico",
+  "coordenadas": {
+    "latitud": -0.2149,
+    "longitud": -78.5087
+  },
+  "anio_construccion": [1892, 1924],
+  "arquitecto": "Emilio Tarlier",
+  "area_construccion": 15000.0,
+  "funcion": "Templo religioso",
+  "multimedia": [
+    {
+      "url": "https://res.cloudinary.com/.../image.jpg",
+      "tipo": "imagen",
+      "descripcion": "Vista exterior"
+    }
+  ],
+  "fecha_creacion": "2024-03-05T10:30:00Z",
+  "activo": true
+}
+```
+
+### usuarios (Users)
+
+Stores user accounts and authentication data.
+
+```json
+{
+  "_id": "ObjectId",
+  "nombre": "Juan Pérez",
+  "email": "juan@example.com",
+  "password_hash": "$2b$12$...",
+  "rol": "visitante",
+  "favoritos": ["destino_id_1", "destino_id_2"],
+  "rutas_recorridas": ["ruta_id_1"],
+  "pois_visitados": ["poi_id_1"],
+  "fecha_creacion": "2024-03-01T08:00:00Z"
+}
+```
+
+**Roles:**
+- `admin` - Full access (create/edit/delete destinations)
+- `editor` - Can edit and change destination status
+- `visitante` - Read-only, can save favorites
+
+### rutas (Routes)
+
+Stores tourist routes and itineraries.
+
+```json
+{
+  "_id": "ObjectId",
+  "nombre": "Ruta del Centro Histórico",
+  "descripcion": "Tour por los principales monumentos",
+  "pois": [
+    {
+      "destino_id": "ObjectId",
+      "orden": 1
+    },
+    {
+      "destino_id": "ObjectId",
+      "orden": 2
+    }
+  ],
+  "distancia_total": 3.5,
+  "duracion_estimada": 120,
+  "fecha_creacion": "2024-03-05T14:00:00Z"
+}
+```
+
+## MongoDB Connection
+
+The application uses a singleton pattern for database connections:
+
+```python src/infrastructure/database/mongo_config.py
+from pymongo import MongoClient, errors
+from src.config.settings import get_settings
+
+settings = get_settings()
+
+class MongoDBConnection:
+    _client = None
+    _db = None
+
+    @classmethod
+    def connect(cls):
+        if cls._client is None:
+            try:
+                print("🔗 Conectando a MongoDB Atlas...")
+                cls._client = MongoClient(
+                    settings.mongo_uri, 
+                    serverSelectionTimeoutMS=5000
+                )
+                cls._db = cls._client[settings.mongo_db]
+                cls._client.admin.command('ping')
+                print(f"✅ Conectado a MongoDB ({settings.mongo_db}) correctamente.")
+            except errors.ServerSelectionTimeoutError:
+                print("❌ Error: No se pudo conectar a MongoDB (timeout).")
+        return cls._db
+
+    @classmethod
+    def get_db(cls):
+        if cls._db is None:
+            cls.connect()
+        return cls._db
+
+def get_database():
+    return MongoDBConnection.get_db()
+```
+
+## Database Operations
+
+### Using MongoDB Shell
+
+```bash
+# Connect to MongoDB
+mongosh
+
+# Switch to database
+use turismo_digital_uce
+
+# Show all collections
+show collections
+
+# Find all destinations
+db.destinos.find().pretty()
+
+# Find one destination
+db.destinos.findOne({nombre: "Basílica del Voto Nacional"})
+
+# Count documents
+db.destinos.countDocuments()
+
+# Create index on coordinates
+db.destinos.createIndex({"coordenadas.latitud": 1, "coordenadas.longitud": 1})
+```
+
+### Using Python
+
+```python
+from src.infrastructure.database.mongo_config import get_database
+
+# Get database connection
+db = get_database()
+
+# Insert document
+db.destinos.insert_one({
+    "nombre": "Test Destination",
+    "ubicacion": "Quito",
+    "coordenadas": {"latitud": -0.22, "longitud": -78.51}
+})
+
+# Find documents
+results = db.destinos.find({"activo": True})
+for doc in results:
+    print(doc["nombre"])
+
+# Update document
+db.destinos.update_one(
+    {"nombre": "Test Destination"},
+    {"$set": {"activo": False}}
+)
+
+# Delete document
+db.destinos.delete_one({"nombre": "Test Destination"})
+```
+
+## Indexes
+
+For optimal performance, create these indexes:
+
+```javascript
+// Geospatial index for location queries
+db.destinos.createIndex({"coordenadas.latitud": 1, "coordenadas.longitud": 1})
+
+// Text search on destination names
+db.destinos.createIndex({"nombre": "text", "ubicacion": "text"})
+
+// User email (unique)
+db.usuarios.createIndex({"email": 1}, {unique: true})
+
+// Active destinations
+db.destinos.createIndex({"activo": 1})
+```
+
+## Backup and Restore
+
+### Export database
+
+```bash
+mongodump --uri="mongodb://localhost:27017/turismo_digital_uce" --out=./backup
+```
+
+### Import database
+
+```bash
+mongorestore --uri="mongodb://localhost:27017/turismo_digital_uce" ./backup/turismo_digital_uce
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Connection timeout">
+    **Local MongoDB:**
+    ```bash
+    # Check if MongoDB is running
+    sudo systemctl status mongod
+
+    # Restart MongoDB
+    sudo systemctl restart mongod
+    ```
+
+    **MongoDB Atlas:**
+    - Verify IP whitelist includes your IP
+    - Check username/password in connection string
+    - Ensure cluster is not paused
+  </Accordion>
+
+  <Accordion title="Authentication failed">
+    **Local MongoDB:**
+    ```bash
+    # Create admin user
+    mongosh
+    use admin
+    db.createUser({
+      user: "admin",
+      pwd: "password",
+      roles: ["root"]
+    })
+    ```
+
+    Update URI: `mongodb://admin:password@localhost:27017/`
+  </Accordion>
+
+  <Accordion title="Database not created">
+    MongoDB creates databases lazily. The database will appear after inserting the first document:
+
+    ```python
+    db = get_database()
+    db.destinos.insert_one({"test": "data"})
+    ```
+  </Accordion>
+
+  <Accordion title="Port 27017 already in use">
+    ```bash
+    # Find process using port
+    sudo lsof -i :27017
+
+    # Kill the process
+    sudo kill -9 <PID>
+
+    # Or change MongoDB port in /etc/mongod.conf
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Backend Setup" icon="server" href="/guides/backend-setup">
+    Learn how to run the FastAPI backend
+  </Card>
+  <Card title="Frontend Setup" icon="react" href="/guides/frontend-setup">
+    Set up the React frontend with Vite
+  </Card>
+</CardGroup>

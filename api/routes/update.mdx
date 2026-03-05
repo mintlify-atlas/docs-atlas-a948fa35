@@ -1,0 +1,147 @@
+---
+title: "Update Route"
+api: "PUT /rutas/{id}"
+description: "Update an existing tourist route's information and POI sequence"
+---
+
+Updates a tourist route with new information. You can modify the name, description, category, and reorder or change the POIs in the route.
+
+## Authentication
+
+Requires **Editor** role or higher.
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the route to update
+</ParamField>
+
+<ParamField body="nombre" type="string" required>
+  Updated name of the route
+</ParamField>
+
+<ParamField body="descripcion" type="string">
+  Updated description (optional)
+</ParamField>
+
+<ParamField body="categoria" type="string">
+  Updated category classification
+</ParamField>
+
+<ParamField body="pois" type="array">
+  Updated array of POI objects
+  
+  <ParamField body="poi_id" type="string" required>
+    ID of the POI
+  </ParamField>
+  
+  <ParamField body="order" type="integer">
+    Position in the route. If not provided, uses array index.
+  </ParamField>
+</ParamField>
+
+<ResponseField name="mensaje" type="string">
+  Confirmation message
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X PUT https://api.tesisrutas.com/rutas/507f1f77bcf86cd799439020 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "Ruta Colonial Extendida",
+    "descripcion": "Recorrido ampliado por monumentos coloniales",
+    "categoria": "Cultural",
+    "pois": [
+      {"poi_id": "507f1f77bcf86cd799439011", "order": 0},
+      {"poi_id": "507f1f77bcf86cd799439012", "order": 1},
+      {"poi_id": "507f1f77bcf86cd799439015", "order": 2},
+      {"poi_id": "507f1f77bcf86cd799439013", "order": 3}
+    ]
+  }'
+```
+
+```python Python
+import requests
+
+ruta_id = "507f1f77bcf86cd799439020"
+url = f"https://api.tesisrutas.com/rutas/{ruta_id}"
+
+headers = {
+    "Authorization": "Bearer YOUR_TOKEN",
+    "Content-Type": "application/json"
+}
+
+data = {
+    "nombre": "Ruta Colonial Extendida",
+    "descripcion": "Recorrido ampliado por monumentos coloniales",
+    "categoria": "Cultural",
+    "pois": [
+        {"poi_id": "507f1f77bcf86cd799439011", "order": 0},
+        {"poi_id": "507f1f77bcf86cd799439012", "order": 1},
+        {"poi_id": "507f1f77bcf86cd799439015", "order": 2},
+        {"poi_id": "507f1f77bcf86cd799439013", "order": 3}
+    ]
+}
+
+response = requests.put(url, json=data, headers=headers)
+print(response.json())
+```
+
+```javascript JavaScript
+const rutaId = '507f1f77bcf86cd799439020';
+const response = await fetch(`https://api.tesisrutas.com/rutas/${rutaId}`, {
+  method: 'PUT',
+  headers: {
+    'Authorization': 'Bearer YOUR_TOKEN',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    nombre: 'Ruta Colonial Extendida',
+    descripcion: 'Recorrido ampliado por monumentos coloniales',
+    categoria: 'Cultural',
+    pois: [
+      { poi_id: '507f1f77bcf86cd799439011', order: 0 },
+      { poi_id: '507f1f77bcf86cd799439012', order: 1 },
+      { poi_id: '507f1f77bcf86cd799439015', order: 2 },
+      { poi_id: '507f1f77bcf86cd799439013', order: 3 }
+    ]
+  })
+});
+
+const data = await response.json();
+console.log(data);
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "mensaje": "Ruta actualizada correctamente"
+}
+```
+
+```json 404 Not Found
+{
+  "detail": "Ruta no encontrada o no actualizada"
+}
+```
+
+</ResponseExample>
+
+## Update Behavior
+
+- All fields are updated atomically
+- POI order is respected as provided in the request
+- If `order` is not specified for a POI, array index is used
+- Route maintains its original `creado_en` timestamp
+- Update timestamp is managed automatically by the system
+
+## Error Responses
+
+- **404 Not Found**: Route does not exist or update failed
+- **401 Unauthorized**: Missing or invalid authentication token
+- **403 Forbidden**: User does not have Editor role
+- **422 Unprocessable Entity**: Invalid request data

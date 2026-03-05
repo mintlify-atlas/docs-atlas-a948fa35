@@ -1,0 +1,187 @@
+---
+title: 'Update User'
+api: 'PUT /usuarios/actualizar/{user_id}'
+description: 'Update user profile information including name, email, password, and role'
+---
+
+## Authentication
+
+Requires JWT authentication. Users can update their own profile, or admins can update any user.
+
+```bash
+Authorization: Bearer <jwt_token>
+```
+
+## Path Parameters
+
+<ParamField path="user_id" type="string" required>
+  The unique identifier of the user to update (MongoDB ObjectId)
+</ParamField>
+
+## Body Parameters
+
+<ParamField body="nombre" type="string">
+  User's full name
+</ParamField>
+
+<ParamField body="email" type="string">
+  User's email address
+</ParamField>
+
+<ParamField body="password" type="string">
+  New password (will be hashed with bcrypt before storage)
+</ParamField>
+
+<ParamField body="rol" type="string">
+  User role: `admin`, `editor`, or `visitante`
+  
+  **Note:** Only admins can change roles. Non-admin users attempting to set this field will have it ignored.
+</ParamField>
+
+## Authorization Rules
+
+- **Self-update**: Any authenticated user can update their own profile (except role)
+- **Admin-update**: Admins can update any user and change roles
+- **Restricted**: Users cannot update other users' profiles unless they are admins
+
+## Request Example
+
+```json
+{
+  "nombre": "Juan Carlos Pérez",
+  "email": "juan.perez@example.com",
+  "password": "newSecurePassword123",
+  "rol": "editor"
+}
+```
+
+## Response
+
+<ResponseField name="message" type="string">
+  Success message
+</ResponseField>
+
+<ResponseField name="usuario" type="object">
+  Updated user information
+  
+  <Expandable title="Usuario Object">
+    <ResponseField name="nombre" type="string">
+      Updated user name
+    </ResponseField>
+    
+    <ResponseField name="email" type="string">
+      Updated email address
+    </ResponseField>
+    
+    <ResponseField name="rol" type="string">
+      User role (admin, editor, or visitante)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseExample>
+```json Response
+{
+  "message": "Usuario actualizado correctamente.",
+  "usuario": {
+    "nombre": "Juan Carlos Pérez",
+    "email": "juan.perez@example.com",
+    "rol": "editor"
+  }
+}
+```
+</ResponseExample>
+
+## Code Examples
+
+<CodeGroup>
+```bash cURL
+curl -X PUT "https://api.tesisrutas.com/usuarios/actualizar/507f1f77bcf86cd799439011" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "Juan Carlos Pérez",
+    "email": "juan.perez@example.com"
+  }'
+```
+
+```python Python
+import requests
+
+url = "https://api.tesisrutas.com/usuarios/actualizar/507f1f77bcf86cd799439011"
+headers = {
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "Content-Type": "application/json"
+}
+data = {
+    "nombre": "Juan Carlos Pérez",
+    "email": "juan.perez@example.com",
+    "password": "newSecurePassword123"
+}
+
+response = requests.put(url, headers=headers, json=data)
+result = response.json()
+print(result["message"])
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://api.tesisrutas.com/usuarios/actualizar/507f1f77bcf86cd799439011',
+  {
+    method: 'PUT',
+    headers: {
+      'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      nombre: 'Juan Carlos Pérez',
+      email: 'juan.perez@example.com'
+    })
+  }
+);
+
+const result = await response.json();
+console.log(result.message);
+```
+</CodeGroup>
+
+## Error Responses
+
+<ResponseField name="403" type="error">
+  Forbidden - User attempting to update another user without admin privileges
+  ```json
+  {
+    "detail": "No tienes permisos para actualizar este usuario."
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="400" type="error">
+  Bad Request - Invalid data or user not found
+  ```json
+  {
+    "detail": "Usuario no encontrado."
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="401" type="error">
+  Unauthorized - Missing or invalid JWT token
+  ```json
+  {
+    "detail": "Not authenticated"
+  }
+  ```
+</ResponseField>
+
+## Implementation Details
+
+Source: `src/infrastructure/api/routers/usuario_router.py:34-81`
+
+This endpoint uses the `ActualizarUsuarioUseCase` which:
+- Validates user existence
+- Applies partial updates (only provided fields are changed)
+- Hashes passwords using bcrypt before storage
+- Enforces role update restrictions for non-admin users
+
+All fields are optional - you can update only the fields you need to change.

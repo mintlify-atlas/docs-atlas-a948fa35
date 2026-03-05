@@ -1,80 +1,330 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with Tesis Rutas in minutes - browse tourist routes as a visitor or create your first destination as an admin
 ---
 
-## Get started in three steps
+## Welcome to Tesis Rutas
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+Tesis Rutas is a tourism platform for managing heritage destinations and tourist routes at Universidad Central del Ecuador. This guide will help you get started quickly based on your role.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+The platform supports three user roles: **visitor** (browse content), **editor** (manage destinations and routes), and **administrator** (full system access).
 </Note>
+
+## For Visitors: Explore Routes
+
+Get started exploring tourist routes and heritage destinations in minutes.
+
+<Steps>
+  <Step title="Access the Interactive Map">
+    Navigate to the map page at `/mapa` to view all destinations and routes:
+
+    ```bash
+    http://localhost:5173/mapa
+    ```
+
+    The map displays Points of Interest (POIs) for all active heritage destinations with interactive markers.
+  </Step>
+
+  <Step title="Browse Available Routes">
+    Visit the routes page to see all curated tourist routes:
+
+    ```bash
+    http://localhost:5173/rutas
+    ```
+
+    Each route includes:
+    - Name and description
+    - Category (cultural, historical, architectural, etc.)
+    - Ordered list of destinations (POIs)
+    - Interactive map visualization
+  </Step>
+
+  <Step title="View Destination Details">
+    Click on any destination to see detailed information:
+
+    ```bash
+    http://localhost:5173/destinos/:id
+    ```
+
+    Destination pages include:
+    - Heritage significance
+    - Construction year and architect
+    - Location and coordinates
+    - Multimedia gallery (images and videos)
+    - Building area and function
+  </Step>
+
+  <Step title="Create an Account (Optional)">
+    Register to save favorite destinations and access personalized features:
+
+    ```bash
+    POST http://localhost:8000/auth/register
+    ```
+
+    Required fields:
+    ```json
+    {
+      "nombre": "Your Name",
+      "email": "your.email@example.com",
+      "password": "secure_password"
+    }
+    ```
+
+    <Note>New accounts are created with the **visitor** role by default.</Note>
+  </Step>
+</Steps>
+
+## For Administrators: Create Your First Destination
+
+Learn how to add heritage destinations to the platform.
+
+<Steps>
+  <Step title="Authenticate as Admin">
+    Login with admin credentials to receive a JWT token:
+
+    ```bash
+    POST http://localhost:8000/auth/login
+    ```
+
+    Request body:
+    ```json
+    {
+      "email": "admin@example.com",
+      "password": "your_password"
+    }
+    ```
+
+    Response includes the access token:
+    ```json
+    {
+      "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "token_type": "bearer",
+      "usuario": {
+        "id": "...",
+        "nombre": "Admin User",
+        "email": "admin@example.com",
+        "rol": "administrador"
+      }
+    }
+    ```
+
+    <Warning>Include this token in the Authorization header for all admin operations: `Authorization: Bearer <token>`</Warning>
+  </Step>
+
+  <Step title="Navigate to Create Destination">
+    Access the admin interface:
+
+    ```bash
+    http://localhost:5173/admin/destinos/crear
+    ```
+
+    Or use the API directly (recommended for integration):
+    ```bash
+    POST http://localhost:8000/destinos/
+    ```
+  </Step>
+
+  <Step title="Submit Destination Data">
+    Send the destination information with required fields:
+
+    ```json
+    {
+      "nombre": "Basílica del Voto Nacional",
+      "ubicacion": "Quito, Ecuador",
+      "importancia": "Templo católico neogótico, uno de los más grandes de América",
+      "coordenadas": {
+        "latitud": -0.214824,
+        "longitud": -78.509293
+      },
+      "anio_construccion": [1892, 1988],
+      "arquitecto": "Emilio Tarlier",
+      "area_construccion": 15000.0,
+      "funcion": "Templo religioso"
+    }
+    ```
+
+    <Accordion title="Field Descriptions">
+      - **nombre** (required): Name of the heritage site
+      - **ubicacion** (required): Physical location/address
+      - **importancia** (required): Historical or cultural significance
+      - **coordenadas** (required): GPS coordinates (latitude/longitude)
+      - **anio_construccion** (required): Construction year(s) - array with 1 or 2 values for start/end
+      - **arquitecto** (optional): Architect name
+      - **area_construccion** (optional): Building area in m²
+      - **funcion** (optional): Primary function or purpose
+    </Accordion>
+
+    Backend validation (from `src/domain/entities/destino.py:31-33`):
+    ```python
+    if not anio_construccion or len(anio_construccion) not in (1, 2):
+        raise ValueError("El año de construcción debe contener uno o dos valores válidos.")
+    ```
+  </Step>
+
+  <Step title="Upload Multimedia Files">
+    Add images and videos to showcase the destination:
+
+    ```bash
+    POST http://localhost:8000/destinos/{id}/multimedia
+    ```
+
+    Upload 1-3 files per request (max 10 total per destination):
+
+    ```bash
+    curl -X POST \
+      -H "Authorization: Bearer <token>" \
+      -F "files=@image1.jpg" \
+      -F "files=@image2.jpg" \
+      http://localhost:8000/destinos/{id}/multimedia
+    ```
+
+    Files are automatically uploaded to Cloudinary and organized in folders by destination ID.
+
+    <Note>
+    Supported formats: Images (JPG, PNG, WebP) and Videos (MP4, WebM). The system automatically detects file type and extracts metadata like dimensions and duration.
+    </Note>
+  </Step>
+
+  <Step title="Verify Creation">
+    View your newly created destination:
+
+    ```bash
+    GET http://localhost:8000/destinos/
+    ```
+
+    Or visit the frontend:
+    ```bash
+    http://localhost:5173/destinos
+    ```
+
+    The destination is now visible to all users and can be included in tourist routes.
+  </Step>
+</Steps>
+
+## Quick API Reference
+
+### Base URLs
+
+<CodeGroup>
+```bash Backend API
+http://localhost:8000
+```
+
+```bash Frontend
+http://localhost:5173
+```
+</CodeGroup>
+
+### Authentication
+
+```bash
+# Register
+POST /auth/register
+
+# Login (returns JWT)
+POST /auth/login
+```
+
+### Destinations
+
+```bash
+# List all destinations (public)
+GET /destinos/
+
+# Create destination (admin only)
+POST /destinos/
+
+# Update destination (admin only)
+PUT /destinos/{id}
+
+# Upload multimedia (admin only)
+POST /destinos/{id}/multimedia
+
+# Delete multimedia (admin only)
+DELETE /destinos/{id}/multimedia?public_id={cloudinary_id}
+```
+
+### Routes
+
+```bash
+# List all routes (public)
+GET /rutas/
+
+# Get route details (public)
+GET /rutas/{id}
+
+# Create route (editor/admin)
+POST /rutas/
+
+# Generate route from POI (public)
+POST /rutas/generar-desde-poi
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture Overview" icon="sitemap" href="/architecture">
+    Learn about the Clean Architecture design and technology stack
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api/auth/register">
+    Explore detailed API documentation and endpoints
+  </Card>
+  
+  <Card title="Frontend Guide" icon="browser" href="/guides/frontend-setup">
+    Build custom interfaces with React and Leaflet maps
+  </Card>
+  
+  <Card title="Deployment" icon="rocket" href="/guides/deployment">
+    Deploy to production with best practices
+  </Card>
+</CardGroup>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="CORS errors when calling API">
+    Ensure your frontend origin is included in the CORS configuration (`src/infrastructure/api/main.py:13-17`):
+
+    ```python
+    origins = [
+        "http://localhost:5173",  # Vite (frontend)
+        "http://127.0.0.1:5173",
+        "https://tesis-rutas.vercel.app",
+    ]
+    ```
+  </Accordion>
+
+  <Accordion title="JWT token expired">
+    Tokens expire after 60 minutes (default). Request a new token by logging in again:
+
+    ```bash
+    POST /auth/login
+    ```
+
+    Adjust expiration in `src/config/settings.py:27`:
+    ```python
+    jwt_expire_minutes: int = 60
+    ```
+  </Accordion>
+
+  <Accordion title="MongoDB connection timeout">
+    Verify your MongoDB URI in configuration. Check `src/infrastructure/database/mongo_config.py:24`:
+
+    ```python
+    cls._client = MongoClient(settings.mongo_uri, serverSelectionTimeoutMS=5000)
+    ```
+
+    Ensure network access and credentials are correct.
+  </Accordion>
+
+  <Accordion title="Multimedia upload fails">
+    Check Cloudinary credentials in your environment configuration. Files are uploaded to `destinations/{destino_id}/` folders.
+
+    Verify limits:
+    - 1-3 files per request
+    - Maximum 10 files per destination
+    - Auto-detected resource types (image/video)
+  </Accordion>
+</AccordionGroup>

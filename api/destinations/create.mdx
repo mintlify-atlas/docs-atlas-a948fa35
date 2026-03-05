@@ -1,0 +1,177 @@
+---
+title: 'Create Destination'
+api: 'POST /destinos'
+description: 'Create a new heritage site (destination) in the system'
+---
+
+## Authentication
+
+**Required Role:** Admin
+
+This endpoint requires authentication with admin privileges. Include a valid JWT token in the Authorization header.
+
+## Request Body
+
+<ParamField body="nombre" type="string" required>
+  Name of the heritage site
+</ParamField>
+
+<ParamField body="ubicacion" type="string" required>
+  Location or address of the site
+</ParamField>
+
+<ParamField body="importancia" type="string" required>
+  Historical or cultural significance of the site
+</ParamField>
+
+<ParamField body="coordenadas" type="object" required>
+  Geographic coordinates of the site
+  
+  <ParamField body="coordenadas.latitud" type="number" required>
+    Latitude (-90 to 90)
+  </ParamField>
+  
+  <ParamField body="coordenadas.longitud" type="number" required>
+    Longitude (-180 to 180)
+  </ParamField>
+</ParamField>
+
+<ParamField body="anio_construccion" type="array" required>
+  Year(s) of construction. Must contain 1 or 2 integer values.
+  - Single value: `[1850]` (exact year)
+  - Range: `[1850, 1860]` (construction period)
+</ParamField>
+
+<ParamField body="arquitecto" type="string">
+  Name of the architect (optional)
+</ParamField>
+
+<ParamField body="area_construccion" type="number">
+  Construction area in square meters (optional)
+</ParamField>
+
+<ParamField body="funcion" type="string">
+  Current or historical function of the site (optional)
+</ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Success message
+</ResponseField>
+
+<ResponseField name="id" type="string">
+  MongoDB ObjectId of the newly created destination
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://api.tesisrutas.com/destinos \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "Catedral de Lima",
+    "ubicacion": "Plaza Mayor, Lima Centro",
+    "importancia": "Principal templo católico del Perú, construcción colonial",
+    "coordenadas": {
+      "latitud": -12.046374,
+      "longitud": -77.030090
+    },
+    "anio_construccion": [1535, 1649],
+    "arquitecto": "Francisco Becerra",
+    "area_construccion": 8900,
+    "funcion": "Templo religioso y sede arquidiocesana"
+  }'
+```
+
+```python Python
+import requests
+
+url = "https://api.tesisrutas.com/destinos"
+headers = {
+    "Authorization": "Bearer YOUR_ADMIN_TOKEN",
+    "Content-Type": "application/json"
+}
+
+data = {
+    "nombre": "Catedral de Lima",
+    "ubicacion": "Plaza Mayor, Lima Centro",
+    "importancia": "Principal templo católico del Perú, construcción colonial",
+    "coordenadas": {
+        "latitud": -12.046374,
+        "longitud": -77.030090
+    },
+    "anio_construccion": [1535, 1649],
+    "arquitecto": "Francisco Becerra",
+    "area_construccion": 8900,
+    "funcion": "Templo religioso y sede arquidiocesana"
+}
+
+response = requests.post(url, json=data, headers=headers)
+print(response.json())
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.tesisrutas.com/destinos', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_ADMIN_TOKEN',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    nombre: 'Catedral de Lima',
+    ubicacion: 'Plaza Mayor, Lima Centro',
+    importancia: 'Principal templo católico del Perú, construcción colonial',
+    coordenadas: {
+      latitud: -12.046374,
+      longitud: -77.030090
+    },
+    anio_construccion: [1535, 1649],
+    arquitecto: 'Francisco Becerra',
+    area_construccion: 8900,
+    funcion: 'Templo religioso y sede arquidiocesana'
+  })
+});
+
+const data = await response.json();
+console.log(data);
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "message": "Destino creado correctamente",
+  "id": "507f1f77bcf86cd799439011"
+}
+```
+
+```json Error Response
+{
+  "detail": "El año de construcción debe contener uno o dos valores válidos."
+}
+```
+
+</ResponseExample>
+
+## Validation Rules
+
+- **nombre**, **ubicacion**, **importancia**: Required, will be trimmed of whitespace
+- **coordenadas.latitud**: Must be between -90 and 90
+- **coordenadas.longitud**: Must be between -180 and 180
+- **anio_construccion**: Must be an array with exactly 1 or 2 integer values
+- New destinations are created with `activo: true` by default
+- **multimedia** array is initialized as empty; use the multimedia endpoints to add files
+
+## Implementation Details
+
+This endpoint:
+1. Validates the request data against domain rules
+2. Creates a `Destino` entity with validated coordinates
+3. Stores the document in the `sitios_patrimoniales` MongoDB collection
+4. Returns the generated MongoDB ObjectId for future operations
+
+**Source:** `destinos_router.py:20-28`

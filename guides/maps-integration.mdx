@@ -1,0 +1,447 @@
+---
+title: 'Maps Integration'
+description: 'Integrate Leaflet maps to display POIs and routes in Tesis Rutas'
+icon: 'map-location-dot'
+---
+
+## Overview
+
+Tesis Rutas uses Leaflet and React Leaflet to provide interactive maps for displaying tourist destinations (POIs) and routes. This guide covers setup, displaying markers, and route visualization.
+
+## Prerequisites
+
+- React 19.2+
+- Leaflet 1.9.4+
+- React Leaflet 5.0+
+- Node.js environment
+
+## Installation
+
+The required packages are already configured in the project:
+
+```json package.json
+{
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "react-leaflet": "^5.0.0",
+    "@turf/turf": "^7.3.2"
+  }
+}
+```
+
+Install dependencies:
+
+```bash
+npm install leaflet react-leaflet @turf/turf
+```
+
+## Basic Map Setup
+
+<Steps>
+  <Step title="Import Leaflet CSS">
+    Always import Leaflet styles before using map components:
+
+    ```jsx
+    import "leaflet/dist/leaflet.css";
+    import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+    import L from "leaflet";
+    ```
+  </Step>
+
+  <Step title="Fix Default Marker Icons">
+    Leaflet icons require a fix when using Vite/Webpack bundlers:
+
+    ```jsx src/components/Mapa/MapaBase.jsx
+    import L from "leaflet";
+
+    /* Fix iconos Leaflet (Vite) */
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl:
+        "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+      iconUrl:
+        "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+      shadowUrl:
+        "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+    });
+    ```
+
+    <Note>
+      This fix ensures marker icons load correctly in production builds.
+    </Note>
+  </Step>
+
+  <Step title="Create Base Map Component">
+    ```jsx src/components/Mapa/MapaBase.jsx
+    import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+    import "leaflet/dist/leaflet.css";
+
+    export default function MapaBase({ rutas }) {
+      // Centro inicial UCE (hardcode SOLO para init)
+      const center = [-0.201, -78.502];
+
+      // Aplanamos POIs de todas las rutas
+      const pois = rutas.flatMap((ruta) => ruta.pois);
+
+      return (
+        <MapContainer
+          center={center}
+          zoom={17}
+          className="h-full w-full"
+        >
+          <TileLayer
+            attribution='&copy; OpenStreetMap contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+
+          {pois.map((poi) => (
+            <Marker
+              key={poi.id}
+              position={[poi.lat, poi.lng]}
+            >
+              <Popup>
+                <strong>{poi.nombre}</strong>
+                <br />
+                {poi.ubicacion}
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+      );
+    }
+    ```
+  </Step>
+</Steps>
+
+## Displaying POIs (Points of Interest)
+
+### Single POI Map
+
+Display a single destination on a map with conditional rendering:
+
+```jsx src/components/Mapa/MapaPOI.jsx
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+
+export default function MapaPOI({ nombre, latitud, longitud }) {
+  // Validate coordinates
+  if (!latitud || !longitud) {
+    return (
+      <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground bg-muted rounded-lg">
+        No hay coordenadas para mostrar.
+      </div>
+    );
+  }
+
+  const position = [latitud, longitud];
+
+  return (
+    <div className="h-[300px] w-full rounded-lg overflow-hidden">
+      <MapContainer
+        center={position}
+        zoom={16}
+        scrollWheelZoom={false}
+        className="h-full w-full"
+      >
+        <TileLayer
+          attribution="&copy; OpenStreetMap contributors"
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <Marker position={position}>
+          <Popup>{nombre}</Popup>
+        </Marker>
+      </MapContainer>
+    </div>
+  );
+}
+```
+
+<Note>
+  The `scrollWheelZoom={false}` property prevents accidental zooming when scrolling the page.
+</Note>
+
+### Multiple POIs Map
+
+Display all destinations from context:
+
+```jsx src/features/mapa/pages/MapaPage.jsx
+import { useEffect, useMemo } from "react";
+import { useAuth } from "../../../context/AuthContext";
+import MapView from "../../../components/Mapa/MapView";
+import { useMapaDestinos } from "../hooks/useMapaDestinos";
+import { useDestinosContext } from "../../../context/DestinosContext/useDestinosContext";
+import { useRutas } from "../../../hooks/useRutas/useRutas";
+
+export default function MapaPage() {
+  const { user } = useAuth();
+
+  const { destinos, loading: loadingDestinos, error: errorDestinos } = useDestinosContext();
+  const { pois } = useMapaDestinos(destinos);
+
+  const { rutas, fetchRutas, loading: loadingRutas, error: errorRutas } = useRutas();
+
+  useEffect(() => {
+    fetchRutas();
+  }, []);
+
+  const routes = useMemo(() => {
+    return (rutas || [])
+      .map((r) => {
+        const path = (r.puntos || [])
+          .map((p) => p.position)
+          .filter((pos) => Array.isArray(pos) && pos.length === 2);
+        if (path.length < 2) return null;
+        return { id: r.id, nombre: r.nombre, categoria: r.categoria ?? null, path };
+      })
+      .filter(Boolean);
+  }, [rutas]);
+
+  if (loadingDestinos || loadingRutas) return <p className="p-4">Cargando mapa...</p>;
+
+  if (errorDestinos || errorRutas) {
+    return <p className="p-4 text-red-500">Error al cargar información del mapa</p>;
+  }
+
+  return (
+    <div className="p-4 flex flex-col h-[calc(100vh-120px)]">
+      <header className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Mapa Turístico</h1>
+
+        {user?.rol === "administrador" && (
+          <span className="text-sm text-gray-500">Modo administrador</span>
+        )}
+      </header>
+
+      <div className="flex-1 rounded-lg overflow-hidden border">
+        <MapView pois={pois} routes={routes} showRoutes={false} />
+      </div>
+    </div>
+  );
+}
+```
+
+## Route Visualization
+
+### Route Data Structure
+
+Routes are represented as arrays of coordinate pairs:
+
+```javascript
+const routes = [
+  {
+    id: "route_1",
+    nombre: "Ruta Histórica",
+    categoria: "cultural",
+    path: [
+      [-0.201, -78.502],  // [lat, lng]
+      [-0.202, -78.503],
+      [-0.203, -78.504]
+    ]
+  }
+];
+```
+
+### Processing Routes from API
+
+```jsx
+const routes = useMemo(() => {
+  return (rutas || [])
+    .map((r) => {
+      // Extract positions from route points
+      const path = (r.puntos || [])
+        .map((p) => p.position)
+        .filter((pos) => Array.isArray(pos) && pos.length === 2);
+      
+      // Skip routes with less than 2 points
+      if (path.length < 2) return null;
+      
+      return {
+        id: r.id,
+        nombre: r.nombre,
+        categoria: r.categoria ?? null,
+        path
+      };
+    })
+    .filter(Boolean);  // Remove null entries
+}, [rutas]);
+```
+
+### Drawing Routes with Polyline
+
+```jsx
+import { Polyline } from "react-leaflet";
+
+function RouteLayer({ routes }) {
+  return (
+    <>
+      {routes.map((route) => (
+        <Polyline
+          key={route.id}
+          positions={route.path}
+          color="blue"
+          weight={4}
+          opacity={0.7}
+        >
+          <Popup>
+            <strong>{route.nombre}</strong>
+            <br />
+            Categoría: {route.categoria}
+          </Popup>
+        </Polyline>
+      ))}
+    </>
+  );
+}
+```
+
+## Map Configuration Options
+
+### MapContainer Props
+
+| Property | Type | Description | Example |
+|----------|------|-------------|--------|
+| `center` | `[lat, lng]` | Initial map center | `[-0.201, -78.502]` |
+| `zoom` | `number` | Initial zoom level (1-18) | `16` |
+| `scrollWheelZoom` | `boolean` | Enable scroll zoom | `false` |
+| `className` | `string` | CSS classes | `"h-full w-full"` |
+
+### TileLayer Configuration
+
+The platform uses OpenStreetMap tiles:
+
+```jsx
+<TileLayer
+  attribution='&copy; OpenStreetMap contributors'
+  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+/>
+```
+
+<Accordion title="Alternative Tile Providers">
+  You can use different map styles by changing the tile URL:
+
+  ```jsx
+  // Satellite imagery (requires API key)
+  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+
+  // Dark mode
+  url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+
+  // Terrain
+  url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+  ```
+</Accordion>
+
+## Custom Markers
+
+Create custom marker icons for different POI types:
+
+```jsx
+import L from "leaflet";
+
+const customIcon = L.icon({
+  iconUrl: '/marker-custom.png',
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32]
+});
+
+<Marker position={position} icon={customIcon}>
+  <Popup>{nombre}</Popup>
+</Marker>
+```
+
+## Coordinate Formats
+
+<Warning>
+  Always use `[latitude, longitude]` format. This is opposite to many other mapping libraries that use `[lng, lat]`.
+</Warning>
+
+**Correct format:**
+```javascript
+const position = [-0.201, -78.502];  // [lat, lng]
+```
+
+**Incorrect format:**
+```javascript
+const position = [-78.502, -0.201];  // ❌ Wrong!
+```
+
+## Performance Optimization
+
+### Use useMemo for Route Processing
+
+```jsx
+const routes = useMemo(() => {
+  return processRoutes(rutas);
+}, [rutas]);
+```
+
+### Limit Visible Markers
+
+For maps with many POIs, only show markers within viewport:
+
+```jsx
+import { useMap } from "react-leaflet";
+
+function FilteredMarkers({ pois }) {
+  const map = useMap();
+  const bounds = map.getBounds();
+  
+  const visiblePois = pois.filter(poi => 
+    bounds.contains([poi.lat, poi.lng])
+  );
+  
+  return visiblePois.map(poi => (
+    <Marker key={poi.id} position={[poi.lat, poi.lng]} />
+  ));
+}
+```
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Map Not Displaying">
+    Ensure you've imported the Leaflet CSS:
+    ```jsx
+    import "leaflet/dist/leaflet.css";
+    ```
+
+    And set a height on your map container:
+    ```jsx
+    <div className="h-[400px]">
+      <MapContainer ...>
+    </div>
+    ```
+  </Accordion>
+
+  <Accordion title="Markers Not Showing">
+    Apply the icon fix at the top of your component:
+    ```jsx
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+      iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Routes Not Rendering">
+    Verify your path array has at least 2 coordinate pairs:
+    ```jsx
+    if (path.length < 2) return null;
+    ```
+
+    And coordinates are in `[lat, lng]` format, not `[lng, lat]`.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="code" href="/api/destinations/list">
+    Fetch destinations for map display
+  </Card>
+  <Card title="Authentication" icon="lock" href="/guides/authentication">
+    Protect map routes with JWT
+  </Card>
+</CardGroup>

@@ -1,0 +1,139 @@
+---
+title: "Welcome to Tesis Rutas"
+description: "Tourism platform for managing heritage destinations and tourist routes at Universidad Central del Ecuador"
+---
+
+<div style={{
+  background: "linear-gradient(135deg, #df2604 0%, #0e6796 100%)",
+  padding: "3rem 2rem",
+  borderRadius: "8px",
+  color: "white",
+  marginBottom: "2rem"
+}}>
+  <h1 style={{ color: "white", marginTop: 0 }}>Discover Ecuador's Heritage</h1>
+  <p style={{ fontSize: "1.25rem", marginBottom: 0 }}>
+    A comprehensive platform for creating, managing, and exploring tourist routes through Ecuador's rich cultural heritage sites.
+  </p>
+</div>
+
+## What is Tesis Rutas?
+
+Tesis Rutas is a full-stack tourism platform developed at Universidad Central del Ecuador (UCE) that empowers administrators, editors, and visitors to discover and manage heritage destinations throughout Ecuador. Built with modern web technologies and AI-powered route generation, it provides an intuitive way to explore cultural sites and plan tourist routes.
+
+<CardGroup cols={2}>
+  <Card title="Heritage Destinations" icon="landmark" href="/features/destinations">
+    Manage detailed information about Ecuador's cultural and historical sites with rich multimedia support
+  </Card>
+  <Card title="Smart Route Generation" icon="route" href="/features/route-generation">
+    AI-powered route creation based on proximity, preferences, and tourist interests
+  </Card>
+  <Card title="Interactive Maps" icon="map" href="/features/routes">
+    Plan and visualize tourist routes using Leaflet-powered interactive mapping
+  </Card>
+  <Card title="Role-Based Access" icon="users" href="/roles/overview">
+    Three-tier permission system: Admin, Editor, and Visitor roles
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<AccordionGroup>
+  <Accordion title="Destination Management">
+    Create and maintain comprehensive profiles for heritage sites including:
+    - Detailed historical information and importance
+    - Geographic coordinates and location data
+    - Construction dates and architectural details
+    - Rich multimedia galleries (images and videos via Cloudinary)
+    - Active/inactive status management
+  </Accordion>
+
+  <Accordion title="Tourist Route Planning">
+    Build custom tourist routes with:
+    - Drag-and-drop POI (Point of Interest) ordering
+    - AI-powered route suggestions from a starting point
+    - Category-based route organization
+    - Distance and proximity calculations
+    - Interactive map visualization with Leaflet
+  </Accordion>
+
+  <Accordion title="User Experience">
+    Visitors can:
+    - Browse all active destinations and routes
+    - Save favorite destinations
+    - Track visited POIs and completed routes
+    - Get personalized route recommendations
+    - View routes on interactive maps
+  </Accordion>
+
+  <Accordion title="Content Management">
+    Admins and editors can:
+    - Upload and manage multimedia files (up to 10 per destination)
+    - Toggle destination visibility (active/inactive)
+    - Create and modify tourist routes
+    - Assign user roles and permissions
+    - Monitor platform usage and statistics
+  </Accordion>
+</AccordionGroup>
+
+## Technology Stack
+
+Tesis Rutas is built with a modern, scalable architecture:
+
+<CardGroup cols={2}>
+  <Card title="Backend" icon="server">
+    **FastAPI + Python**
+    - Clean Architecture with domain-driven design
+    - JWT-based authentication
+    - MongoDB for flexible data storage
+    - Cloudinary for media management
+  </Card>
+  <Card title="Frontend" icon="window">
+    **React + Vite**
+    - Responsive UI with TailwindCSS
+    - Interactive maps with Leaflet
+    - Radix UI component library
+    - React Router for navigation
+  </Card>
+</CardGroup>
+
+## Quick Links
+
+<CardGroup cols={3}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get up and running in minutes
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/auth/register">
+    Explore the REST API
+  </Card>
+  <Card title="Setup Guide" icon="gear" href="/guides/installation">
+    Installation and configuration
+  </Card>
+</CardGroup>
+
+## Use Cases
+
+**For Tourism Administrators:**
+- Digitize and preserve cultural heritage information
+- Create educational tourist routes for visitors
+- Manage multimedia content for destinations
+- Monitor visitor engagement and popular routes
+
+**For Tourists and Visitors:**
+- Discover Ecuador's cultural heritage sites
+- Follow curated routes based on interests
+- Save favorites and track visited locations
+- Access detailed historical information and photos
+
+**For Content Editors:**
+- Maintain up-to-date destination information
+- Create seasonal or themed tourist routes
+- Toggle destination availability
+- Collaborate on content management
+
+## Getting Started
+
+Ready to explore? Check out our [Quickstart Guide](/quickstart) to begin working with Tesis Rutas, or dive into the [API Reference](/api/auth/register) to integrate with the platform.
+
+<Note>
+  Tesis Rutas is designed for cultural heritage tourism in Ecuador, with a focus on preserving and sharing the rich history of Universidad Central del Ecuador and surrounding areas.
+</Note>

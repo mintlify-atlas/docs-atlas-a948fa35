@@ -1,0 +1,365 @@
+---
+title: 'AI-Powered Route Generation'
+description: 'Automatically generate optimized tourist routes using proximity-based algorithms'
+icon: 'wand-magic-sparkles'
+---
+
+## Overview
+
+Tesis Rutas features intelligent route generation that automatically creates optimized tourist routes from any starting POI. The algorithm uses geographic proximity and the Haversine formula to suggest the most efficient routes.
+
+<Note>
+  The route generation algorithm is **deterministic and geography-based** - it selects the nearest POIs to minimize travel distance.
+</Note>
+
+## How It Works
+
+The route generation system follows these steps:
+
+<Steps>
+  <Step title="Select Starting POI">
+    User provides the ID of a heritage site to use as the route's starting point.
+  </Step>
+  
+  <Step title="Calculate Distances">
+    System calculates the distance from the starting POI to all other active destinations using the Haversine formula.
+  </Step>
+  
+  <Step title="Rank by Proximity">
+    All POIs are sorted by distance in ascending order (nearest first).
+  </Step>
+  
+  <Step title="Select Top N POIs">
+    The algorithm selects the closest N destinations (default: 5) to include in the route.
+  </Step>
+  
+  <Step title="Build Route Object">
+    A `RutaTuristica` object is constructed with ordered POIs but **not saved** to the database.
+  </Step>
+</Steps>
+
+## API Endpoint
+
+**POST** `/rutas/generar-desde-poi`
+
+Public endpoint - no authentication required
+
+### Request
+
+```json
+{
+  "poi_id": "507f1f77bcf86cd799439011"
+}
+```
+
+### Response
+
+```json
+{
+  "nombre": "Ruta recomendada desde Catedral de Lima",
+  "descripcion": "Ruta ordenada automáticamente por cercanía geográfica.",
+  "categoria": "",
+  "puntos": [
+    {
+      "poi_id": "507f1f77bcf86cd799439011",
+      "order": 0,
+      "nombre": "Catedral de Lima"
+    },
+    {
+      "poi_id": "507f1f77bcf86cd799439012",
+      "order": 1,
+      "nombre": "Palacio de Gobierno"
+    },
+    {
+      "poi_id": "507f1f77bcf86cd799439013",
+      "order": 2,
+      "nombre": "Convento de San Francisco"
+    }
+  ],
+  "creado_en": "2026-03-05T21:00:00Z"
+}
+```
+
+<Warning>
+  The generated route is **not automatically saved**. The frontend must explicitly save it by calling the create route endpoint if the user approves the suggestion.
+</Warning>
+
+## Implementation
+
+The `GenerarRutaDesdePOI` use case (src/application/use_cases/Rutas/generar_ruta_desde_poi.py) implements the core algorithm:
+
+```python Route Generation Use Case
+class GenerarRutaDesdePOI:
+    """
+    Genera una ruta ordenando los POIs por cercanía.
+    No guarda, solo construye el objeto RutaTuristica.
+    """
+    def __init__(self, destino_repository: IDestinoRepository):
+        self.destino_repository = destino_repository
+
+    def execute(self, poi_id: str, cantidad: int = 5) -> Optional[RutaTuristica]:
+        """
+        Genera una ruta recomendada desde un POI base.
+        - poi_id: ID del sitio inicial
+        - cantidad: cuantos POIs adicionales incluir
+        """
+        # 1. Obtener POI inicial
+        poi_inicial = self.destino_repository.obtener_por_id(poi_id)
+        
+        if not poi_inicial:
+            return None
+
+        lat1 = poi_inicial["coordenadas"]["latitud"]
+        lon1 = poi_inicial["coordenadas"]["longitud"]
+
+        # 2. Obtener todos los POIs activos (excluir el inicial)
+        todos = self.destino_repository.obtener_todos()
+        otros = [p for p in todos if p["_id"] != poi_id and p["activo"]]
+
+        # 3. Calcular distancias desde el punto inicial
+        distancias = []
+        for poi in otros:
+            lat2 = poi["coordenadas"]["latitud"]
+            lon2 = poi["coordenadas"]["longitud"]
+
+            d = calcular_distancia(lat1, lon1, lat2, lon2)
+
+            distancias.append({
+                "poi": poi,
+                "distancia": d
+            })
+
+        # 4. Ordenar por distancia (ascendente)
+        distancias.sort(key=lambda x: x["distancia"])
+
+        # 5. Seleccionar los N más cercanos
+        seleccionados = distancias[:cantidad]
+
+        # 6. Construir lista de RutaPOI
+        pois_ruta = []
+
+        # Primero el POI inicial (order 0)
+        pois_ruta.append({
+            "poi_id": poi_inicial["_id"],
+            "order": 0,
+            "nombre": poi_inicial.get("nombre")
+        })
+
+        # Luego los POIs cercanos (order 1+)
+        for idx, item in enumerate(seleccionados, start=1):
+            p = item["poi"]
+
+            pois_ruta.append({
+                "poi_id": str(p["_id"]),
+                "order": idx,
+                "nombre": p.get("nombre")
+            })
+
+        # 7. Crear la ruta turística sin guardar
+        ruta = RutaTuristica(
+            nombre=f"Ruta recomendada desde {poi_inicial['nombre']}",
+            descripcion="Ruta ordenada automáticamente por cercanía geográfica.",
+            categoria="",
+            puntos=pois_ruta
+        )
+
+        return ruta
+```
+
+## Distance Calculation
+
+The Haversine formula calculates the great-circle distance between two GPS coordinates:
+
+```python Haversine Formula
+import math
+
+def calcular_distancia(lat1, lng1, lat2, lng2):
+    R = 6371  # Radio de la tierra en km
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * \
+        math.cos(math.radians(lat2)) * math.sin(dlng/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    return R * c
+```
+
+<Accordion title="Haversine Formula Explained">
+  The Haversine formula calculates the shortest distance over the Earth's surface (great-circle distance):
+  
+  - **R**: Earth's radius (6,371 km)
+  - **dlat, dlng**: Delta latitude and longitude in radians
+  - **a**: Square of half the chord length between points
+  - **c**: Angular distance in radians
+  - **R × c**: Distance in kilometers
+  
+  This formula accounts for Earth's curvature, providing accurate distances for tourism routing.
+</Accordion>
+
+## POI Suggestions While Building
+
+The `SugerirPOIsProximos` use case provides real-time suggestions as users build routes:
+
+**POST** `/rutas/sugerencias`
+
+```python Suggestion Algorithm
+class SugerirPOIsProximos:
+    def execute(self, poi_actual_id: str, seleccionados: List[str], limite: int = 5):
+        """
+        Devuelve sugerencias de POIs cercanos al POI actual,
+        excluyendo los ya seleccionados.
+        """
+
+        # Get current POI
+        actual = self.destino_repo.obtener_por_id(poi_actual_id)
+        if not actual:
+            return []
+
+        lat1 = actual["coordenadas"]["latitud"]
+        lon1 = actual["coordenadas"]["longitud"]
+
+        # Get all POIs not already selected
+        todos = self.destino_repo.obtener_todos()
+        candidatos = [p for p in todos if str(p["_id"]) not in seleccionados]
+
+        distancias = []
+
+        # Calculate distances to candidates
+        for p in candidatos:
+            coords = p["coordenadas"]
+            lat2 = coords["latitud"]
+            lon2 = coords["longitud"]
+
+            d = calcular_distancia(lat1, lon1, lat2, lon2)
+
+            distancias.append({
+                "id": str(p["_id"]),
+                "nombre": p["nombre"],
+                "ubicacion": p["ubicacion"],
+                "importancia": p["importancia"],
+                "anio_construccion": p["anio_construccion"],
+                "funcion": p.get("funcion"),
+                "coordenadas": p["coordenadas"],
+                "multimedia": p.get("multimedia", []),
+                "distancia_km": d
+            })
+
+        # Sort by distance and return top N
+        distancias.sort(key=lambda x: x["distancia_km"])
+        return distancias[:limite]
+```
+
+### Request Example
+
+```json
+{
+  "actual": "507f1f77bcf86cd799439011",
+  "seleccionados": ["507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012"]
+}
+```
+
+### Response Example
+
+```json
+{
+  "actual": "507f1f77bcf86cd799439011",
+  "seleccionados": ["507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012"],
+  "sugerencias": [
+    {
+      "id": "507f1f77bcf86cd799439013",
+      "nombre": "Convento de San Francisco",
+      "ubicacion": "Jirón Lampa, Lima",
+      "importancia": "Patrimonio Cultural",
+      "anio_construccion": [1546, 1774],
+      "funcion": "Convento franciscano",
+      "coordenadas": {"latitud": -12.045833, "longitud": -77.029167},
+      "multimedia": [...],
+      "distancia_km": 0.23
+    }
+  ]
+}
+```
+
+## Algorithm Characteristics
+
+<CardGroup cols={2}>
+  <Card title="Greedy Nearest-Neighbor" icon="compass">
+    Selects the closest unvisited POI at each step - fast but may not find the globally optimal route
+  </Card>
+  
+  <Card title="No Save by Default" icon="floppy-disk">
+    Generated routes are ephemeral - they must be explicitly saved by the frontend
+  </Card>
+  
+  <Card title="Active POIs Only" icon="toggle-on">
+    Only includes destinations where `activo = true`, filtering out inactive sites
+  </Card>
+  
+  <Card title="Configurable Size" icon="slider">
+    Default generates 5 additional POIs, but `cantidad` parameter is configurable
+  </Card>
+</CardGroup>
+
+## Use Cases
+
+### Tourist Quick Planning
+
+Visitors can instantly generate a route from any heritage site they're interested in:
+
+1. Browse destinations on the map
+2. Click "Generate Route from Here" on any POI
+3. Review suggested nearby sites (with distances)
+4. Save the route or modify it manually
+
+### Admin Route Creation
+
+Administrators can use route generation as a starting point:
+
+1. Generate initial route from a central POI
+2. Review the auto-generated suggestions
+3. Add/remove POIs manually via suggestions endpoint
+4. Customize route name, description, and category
+5. Save the finalized route
+
+## Limitations
+
+<Warning>
+  **Traveling Salesman Problem (TSP)**
+  
+  The greedy nearest-neighbor algorithm does **not** solve TSP optimally. For complex routes with many POIs, the generated order may not be the absolute shortest path. Consider this a "good enough" heuristic for tourism use cases.
+</Warning>
+
+<Accordion title="Why Not Optimal TSP?">
+  Computing the optimal TSP solution has O(n!) time complexity, making it impractical for real-time route generation. The nearest-neighbor heuristic provides:
+  
+  - **Fast execution**: O(n²) complexity
+  - **Good results**: Typically within 25% of optimal
+  - **Acceptable for tourism**: Routes prioritize accessibility over absolute optimization
+  
+  Future improvements could implement 2-opt optimization or other TSP approximation algorithms.
+</Accordion>
+
+## Best Practices
+
+<Steps>
+  <Step title="Start from Central Locations">
+    Generate routes from well-known, centrally-located POIs for better coverage of nearby sites.
+  </Step>
+  
+  <Step title="Review Before Saving">
+    Always review auto-generated routes - the algorithm doesn't consider factors like opening hours, accessibility, or thematic coherence.
+  </Step>
+  
+  <Step title="Combine with Manual Curation">
+    Use generation as a starting point, then manually adjust based on cultural/historical themes.
+  </Step>
+  
+  <Step title="Consider Distance Limits">
+    For walking tours, verify that suggested POIs are within reasonable walking distance (< 2km recommended).
+  </Step>
+</Steps>
+
+## Related Features
+
+- [Tourist Routes](/features/routes) - Manual route creation and management
+- [Destinations](/features/destinations) - POI data used by the generation algorithm
+- [API Reference](/api/rutas/generar) - Complete API documentation

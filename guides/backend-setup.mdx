@@ -1,0 +1,369 @@
+---
+title: 'Backend Setup'
+description: 'Set up and run the FastAPI backend with uvicorn'
+icon: 'server'
+---
+
+## Overview
+
+The Tesis Rutas backend is built with **FastAPI** and follows **Clean Architecture** principles. It uses MongoDB for data persistence and JWT for authentication.
+
+## Prerequisites
+
+- Python 3.9+ installed
+- MongoDB running (local or Atlas)
+- pip or virtualenv for dependency management
+
+## Installation
+
+<Steps>
+  <Step title="Create virtual environment">
+    ```bash
+    python -m venv venv
+    ```
+  </Step>
+
+  <Step title="Activate virtual environment">
+    <Tabs>
+      <Tab title="Linux/macOS">
+        ```bash
+        source venv/bin/activate
+        ```
+      </Tab>
+      <Tab title="Windows">
+        ```bash
+        venv\Scripts\activate
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+    Key dependencies:
+    - **fastapi** - Modern web framework
+    - **uvicorn** - ASGI server
+    - **pymongo** - MongoDB driver
+    - **python-jose** - JWT authentication
+    - **bcrypt** - Password hashing
+    - **cloudinary** - Image upload service
+    - **pydantic-settings** - Configuration management
+  </Step>
+
+  <Step title="Configure environment">
+    Create `src/config/local_config.json`:
+
+    ```json
+    {
+      "MONGO_URI": "mongodb://localhost:27017",
+      "MONGO_DB": "turismo_digital_uce",
+      "JWT_SECRET_KEY": "your-secret-key-here",
+      "JWT_ALGORITHM": "HS256",
+      "JWT_EXPIRE_MINUTES": 60,
+      "CLOUDINARY_CLOUD_NAME": "your-cloud-name",
+      "CLOUDINARY_API_KEY": "your-api-key",
+      "CLOUDINARY_API_SECRET": "your-api-secret"
+    }
+    ```
+
+    <Warning>
+      Never commit `local_config.json` to version control. It's already in `.gitignore`.
+    </Warning>
+  </Step>
+
+  <Step title="Start the server">
+    ```bash
+    uvicorn src.infrastructure.api.main:app --reload
+    ```
+
+    The API will be available at **http://localhost:8000**
+  </Step>
+</Steps>
+
+## Clean Architecture Structure
+
+The backend follows Clean Architecture with clear separation of concerns:
+
+```
+src/
+├── domain/                    # Enterprise business rules
+│   ├── entities/             # Core business objects
+│   │   ├── destino.py        # Destination entity
+│   │   ├── usuario.py        # User entity
+│   │   ├── ruta_turistica.py # Route entity
+│   │   └── multimedia.py     # Media entity
+│   ├── repositories/         # Repository interfaces
+│   └── value_objects/        # Value objects (Coordenadas)
+├── application/              # Application business rules
+│   ├── use_cases/           # Use case implementations
+│   │   ├── agregar_destino.py
+│   │   ├── editar_destino.py
+│   │   ├── auth/            # Authentication use cases
+│   │   ├── users/           # User management
+│   │   └── Rutas/           # Route management
+│   └── services/            # Application services
+├── infrastructure/           # External interfaces
+│   ├── api/                 # FastAPI routes
+│   │   ├── main.py          # App initialization
+│   │   └── routers/         # API endpoints
+│   │       ├── destinos_router.py
+│   │       ├── rutas_router.py
+│   │       ├── auth_router.py
+│   │       └── usuario_router.py
+│   ├── database/            # MongoDB implementation
+│   │   ├── mongo_config.py  # Connection manager
+│   │   └── destino_repository_impl.py
+│   ├── security/            # JWT utilities
+│   └── services/            # External services (Cloudinary)
+└── config/                   # Configuration
+    ├── settings.py          # Pydantic settings
+    └── local_config.json    # Local credentials (gitignored)
+```
+
+### Architecture Layers
+
+<Steps>
+  <Step title="Domain Layer">
+    Contains business entities and rules. No dependencies on external frameworks.
+
+    ```python src/domain/entities/destino.py
+    from datetime import datetime
+    from typing import Optional
+    from src.domain.value_objects.coordenadas import Coordenadas
+
+    class Destino:
+        def __init__(
+            self,
+            nombre: str,
+            ubicacion: str,
+            importancia: str,
+            coordenadas: Coordenadas,
+            anio_construccion: list[int],
+            id: Optional[str] = None,
+            activo: bool = True
+        ):
+            self.nombre = nombre.strip()
+            self.ubicacion = ubicacion.strip()
+            self.importancia = importancia.strip()
+            self.coordenadas = coordenadas
+            self.anio_construccion = anio_construccion
+            self.id = id
+            self.activo = activo
+
+        def to_dict(self) -> dict:
+            return {
+                "_id": self.id,
+                "nombre": self.nombre,
+                "ubicacion": self.ubicacion,
+                "coordenadas": self.coordenadas.to_dict(),
+                "activo": self.activo
+            }
+    ```
+  </Step>
+
+  <Step title="Application Layer">
+    Implements use cases that orchestrate business logic.
+
+    ```python src/application/use_cases/agregar_destino.py
+    class AgregarDestinoUseCase:
+        def __init__(self, destino_repository):
+            self.destino_repository = destino_repository
+
+        def ejecutar(self, data: dict) -> str:
+            # Business logic
+            destino = self._crear_entidad(data)
+            return self.destino_repository.agregar(destino)
+    ```
+  </Step>
+
+  <Step title="Infrastructure Layer">
+    Handles external concerns: API, database, authentication.
+
+    ```python src/infrastructure/api/main.py
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+
+    app = FastAPI(title="Turismo Digital UCE API")
+
+    # CORS Configuration
+    origins = [
+        "http://localhost:5173",  # Vite frontend
+        "http://127.0.0.1:5173",
+    ]
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Include routers
+    app.include_router(destinos_router.router)
+    app.include_router(rutas_router.router)
+    app.include_router(auth_router.router)
+
+    @app.get("/")
+    def root():
+        return {"message": "API de Turismo Digital UCE funcionando correctamente 🚀"}
+    ```
+  </Step>
+</Steps>
+
+## API Endpoints
+
+The API exposes the following routers:
+
+### Destinos (Destinations)
+
+```python src/infrastructure/api/routers/destinos_router.py
+from fastapi import APIRouter, Depends
+
+router = APIRouter(prefix="/destinos", tags=["Destinos"])
+
+@router.post("/")  # Create destination (admin only)
+@router.get("/")   # List all destinations
+@router.put("/{id}")  # Update destination (admin only)
+@router.delete("/{id}")  # Delete destination (admin only)
+```
+
+### Rutas (Routes)
+
+```python
+router = APIRouter(prefix="/rutas", tags=["Rutas"])
+
+@router.post("/")  # Create route
+@router.get("/")   # List routes
+@router.get("/{id}")  # Get route details
+```
+
+### Auth (Authentication)
+
+```python
+router = APIRouter(prefix="/auth", tags=["Auth"])
+
+@router.post("/register")  # Register new user
+@router.post("/login")     # Login and get JWT token
+```
+
+## Testing Endpoints
+
+<Tabs>
+  <Tab title="FastAPI Docs">
+    Navigate to **http://localhost:8000/docs** for interactive API documentation (Swagger UI).
+
+    Features:
+    - Try endpoints directly from the browser
+    - See request/response schemas
+    - Test authentication flows
+  </Tab>
+
+  <Tab title="curl">
+    ```bash
+    # Test root endpoint
+    curl http://localhost:8000/
+
+    # Get all destinations
+    curl http://localhost:8000/destinos/
+
+    # Login
+    curl -X POST http://localhost:8000/auth/login \
+      -H "Content-Type: application/json" \
+      -d '{"email":"user@example.com","password":"password"}'
+    ```
+  </Tab>
+
+  <Tab title="Python">
+    ```python
+    import requests
+
+    # Test API health
+    response = requests.get("http://localhost:8000/")
+    print(response.json())
+
+    # Get destinations
+    destinos = requests.get("http://localhost:8000/destinos/")
+    print(destinos.json())
+    ```
+  </Tab>
+</Tabs>
+
+## Running with Hot Reload
+
+The `--reload` flag enables auto-restart on code changes:
+
+```bash
+uvicorn src.infrastructure.api.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Options:
+- `--reload` - Auto-reload on file changes
+- `--host 0.0.0.0` - Listen on all network interfaces
+- `--port 8000` - Custom port (default: 8000)
+- `--log-level debug` - Verbose logging
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="ModuleNotFoundError: No module named 'src'">
+    Ensure you're running uvicorn from the project root directory, not from inside `src/`.
+
+    ```bash
+    # Correct (from project root)
+    uvicorn src.infrastructure.api.main:app --reload
+
+    # Wrong (from src/ directory)
+    uvicorn infrastructure.api.main:app --reload
+    ```
+  </Accordion>
+
+  <Accordion title="MongoDB connection timeout">
+    Check if MongoDB is running:
+
+    ```bash
+    # Local MongoDB
+    sudo systemctl status mongod
+
+    # Or test connection
+    mongosh --eval "db.adminCommand('ping')"
+    ```
+
+    Verify `MONGO_URI` in `local_config.json` is correct.
+  </Accordion>
+
+  <Accordion title="CORS errors from frontend">
+    Ensure `http://localhost:5173` is in the `origins` list in `main.py`:
+
+    ```python
+    origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+    ```
+  </Accordion>
+
+  <Accordion title="JWT token errors">
+    Generate a secure secret key:
+
+    ```bash
+    python -c "import secrets; print(secrets.token_urlsafe(32))"
+    ```
+
+    Add it to `local_config.json` as `JWT_SECRET_KEY`.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Database Setup" icon="database" href="/guides/database-setup">
+    Configure MongoDB and understand the schema
+  </Card>
+  <Card title="Frontend Setup" icon="react" href="/guides/frontend-setup">
+    Set up the React frontend
+  </Card>
+</CardGroup>

@@ -1,0 +1,279 @@
+---
+title: 'Activity Tracking'
+description: 'Track user activity including visited POIs and completed routes'
+---
+
+## Register Visited POI
+
+<api>POST /usuarios/{user_id}/visitados</api>
+
+Record that a user has visited a specific Point of Interest (POI).
+
+### Authentication
+
+Requires JWT authentication. Users can track their own visits, or admins can track any user's visits.
+
+```bash
+Authorization: Bearer <jwt_token>
+```
+
+### Path Parameters
+
+<ParamField path="user_id" type="string" required>
+  The user's unique identifier (MongoDB ObjectId)
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="poi_id" type="string" required>
+  The POI identifier to mark as visited
+</ParamField>
+
+### Response
+
+<ResponseField name="message" type="string">
+  Success confirmation message
+</ResponseField>
+
+<ResponseExample>
+```json Response
+{
+  "message": "POI registrado como visitado"
+}
+```
+</ResponseExample>
+
+### Code Examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST "https://api.tesisrutas.com/usuarios/507f1f77bcf86cd799439011/visitados?poi_id=507f191e810c19729de860ea" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+```python Python
+import requests
+
+url = "https://api.tesisrutas.com/usuarios/507f1f77bcf86cd799439011/visitados"
+headers = {
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+params = {
+    "poi_id": "507f191e810c19729de860ea"
+}
+
+response = requests.post(url, headers=headers, params=params)
+print(response.json()["message"])
+```
+
+```javascript JavaScript
+const userId = '507f1f77bcf86cd799439011';
+const poiId = '507f191e810c19729de860ea';
+
+const response = await fetch(
+  `https://api.tesisrutas.com/usuarios/${userId}/visitados?poi_id=${poiId}`,
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+    }
+  }
+);
+
+const result = await response.json();
+console.log(result.message);
+```
+</CodeGroup>
+
+### Error Responses
+
+<ResponseField name="403" type="error">
+  Forbidden - User attempting to track another user's visits
+  ```json
+  {
+    "detail": "No autorizado"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="400" type="error">
+  Bad Request - Failed to register visit
+  ```json
+  {
+    "detail": "No se pudo registrar el POI visitado."
+  }
+  ```
+</ResponseField>
+
+---
+
+## Register Completed Route
+
+<api>POST /usuarios/{user_id}/rutasRegister</api>
+
+Record that a user has completed a tourism route.
+
+### Authentication
+
+Requires JWT authentication. Users can track their own routes, or admins can track any user's routes.
+
+```bash
+Authorization: Bearer <jwt_token>
+```
+
+### Path Parameters
+
+<ParamField path="user_id" type="string" required>
+  The user's unique identifier (MongoDB ObjectId)
+</ParamField>
+
+### Body Parameters
+
+The request body should contain route completion data as a JSON object.
+
+<ParamField body="ruta_id" type="string" required>
+  The unique identifier of the completed route
+</ParamField>
+
+<ParamField body="fecha" type="string">
+  Completion date in ISO 8601 format (e.g., "2024-03-15T10:30:00Z")
+</ParamField>
+
+<ParamField body="duracion" type="number">
+  Time taken to complete the route in minutes
+</ParamField>
+
+<ParamField body="calificacion" type="number">
+  User rating of the route (e.g., 1-5 stars)
+</ParamField>
+
+### Request Example
+
+```json
+{
+  "ruta_id": "507f191e810c19729de860ec",
+  "fecha": "2024-03-15T10:30:00Z",
+  "duracion": 120,
+  "calificacion": 5
+}
+```
+
+### Response
+
+<ResponseField name="message" type="string">
+  Success confirmation message
+</ResponseField>
+
+<ResponseExample>
+```json Response
+{
+  "message": "Ruta registrada correctamente"
+}
+```
+</ResponseExample>
+
+### Code Examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST "https://api.tesisrutas.com/usuarios/507f1f77bcf86cd799439011/rutasRegister" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ruta_id": "507f191e810c19729de860ec",
+    "fecha": "2024-03-15T10:30:00Z",
+    "duracion": 120,
+    "calificacion": 5
+  }'
+```
+
+```python Python
+import requests
+from datetime import datetime
+
+url = "https://api.tesisrutas.com/usuarios/507f1f77bcf86cd799439011/rutasRegister"
+headers = {
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "Content-Type": "application/json"
+}
+data = {
+    "ruta_id": "507f191e810c19729de860ec",
+    "fecha": datetime.utcnow().isoformat() + "Z",
+    "duracion": 120,
+    "calificacion": 5
+}
+
+response = requests.post(url, headers=headers, json=data)
+print(response.json()["message"])
+```
+
+```javascript JavaScript
+const userId = '507f1f77bcf86cd799439011';
+
+const response = await fetch(
+  `https://api.tesisrutas.com/usuarios/${userId}/rutasRegister`,
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      ruta_id: '507f191e810c19729de860ec',
+      fecha: new Date().toISOString(),
+      duracion: 120,
+      calificacion: 5
+    })
+  }
+);
+
+const result = await response.json();
+console.log(result.message);
+```
+</CodeGroup>
+
+### Error Responses
+
+<ResponseField name="403" type="error">
+  Forbidden - User attempting to track another user's routes
+  ```json
+  {
+    "detail": "No autorizado"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="400" type="error">
+  Bad Request - Failed to register route
+  ```json
+  {
+    "detail": "No se pudo registrar la ruta recorrida."
+  }
+  ```
+</ResponseField>
+
+## Authorization Rules
+
+- **Self-track**: Users can track their own activity (visited POIs and completed routes)
+- **Admin-track**: Admins can track activity for any user
+- **Restricted**: Users cannot track activity for other users unless they are admins
+
+## Use Cases
+
+Activity tracking enables:
+- **Personalized recommendations** based on user history
+- **Gamification** with achievements and progress tracking
+- **Analytics** to understand popular POIs and routes
+- **User engagement** metrics and retention analysis
+
+## Implementation Details
+
+**Visited POI Source:** `src/infrastructure/api/routers/usuario_router.py:159-178`
+
+**Completed Route Source:** `src/infrastructure/api/routers/usuario_router.py:181-200`
+
+These endpoints use MongoDB operations:
+- **Visited POIs**: Uses `$addToSet` to prevent duplicate entries in the `pois_visitados` array
+- **Completed Routes**: Uses `$push` to append route completion data to the `rutas_recorridas` array, allowing multiple completions of the same route
+
+The tracking data is stored directly in the user document for fast access and querying.

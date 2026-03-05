@@ -1,0 +1,153 @@
+---
+title: User Roles Overview
+description: Understanding the three-tier role system in Tesis Rutas
+---
+
+## Role Hierarchy
+
+Tesis Rutas implements a three-tier role system to manage access control and permissions across the platform:
+
+<CardGroup cols={3}>
+  <Card title="Visitante" icon="user" href="/roles/visitor">
+    Browse destinations, save favorites, track visits
+  </Card>
+  <Card title="Editor" icon="pen-to-square" href="/roles/editor">
+    Create and manage routes, toggle destination status
+  </Card>
+  <Card title="Administrador" icon="user-shield" href="/roles/admin">
+    Full platform access and user management
+  </Card>
+</CardGroup>
+
+## Role Definition
+
+Roles are defined in the `Usuario` entity as a string field:
+
+```python
+class Usuario:
+    def __init__(self, rol: str = "visitante", ...):
+        self.rol = rol  # "admin", "editor", "visitante"
+```
+
+**Source:** `src/domain/entities/usuario.py:21`
+
+## Permission Matrix
+
+The following table shows which operations are available to each role:
+
+| Feature | Visitante | Editor | Administrador |
+|---------|-----------|--------|---------------|
+| **Authentication** |
+| Register account | ✓ | ✓ | ✓ |
+| Login/logout | ✓ | ✓ | ✓ |
+| View own profile | ✓ | ✓ | ✓ |
+| Update own profile | ✓ | ✓ | ✓ |
+| **Destinations** |
+| Browse destinations | ✓ | ✓ | ✓ |
+| View destination details | ✓ | ✓ | ✓ |
+| Create destinations | ✗ | ✗ | ✓ |
+| Edit destinations | ✗ | ✗ | ✓ |
+| Toggle destination status | ✗ | ✓ | ✓ |
+| Delete destinations | ✗ | ✗ | ✓ |
+| Upload multimedia | ✗ | ✗ | ✓ |
+| Delete multimedia | ✗ | ✗ | ✓ |
+| **Routes** |
+| View routes | ✓ | ✓ | ✓ |
+| Create routes | ✗ | ✓ | ✓ |
+| Update routes | ✗ | ✓ | ✓ |
+| Delete routes | ✗ | ✓ | ✓ |
+| Generate AI routes | ✓ | ✓ | ✓ |
+| Get POI suggestions | ✓ | ✓ | ✓ |
+| **User Management** |
+| View all users | ✗ | ✗ | ✓ |
+| View any user profile | ✗ | ✗ | ✓ |
+| Delete users | ✗ | ✗ | ✓ |
+| Assign roles | ✗ | ✗ | ✓ |
+| **Personal Features** |
+| Add favorites | ✓ | ✓ | ✓ |
+| Remove favorites | ✓ | ✓ | ✓ |
+| Track visited POIs | ✓ | ✓ | ✓ |
+| Register completed routes | ✓ | ✓ | ✓ |
+
+## Role Enforcement
+
+Roles are enforced at the API level using FastAPI dependency injection with three main guard functions:
+
+### require_user
+
+Allows any authenticated user (visitante, editor, or administrador):
+
+```python
+def require_user(request: Request):
+    return _require_role(request, ["visitante", "editor", "administrador"])
+```
+
+**Source:** `src/infrastructure/security/jwt_utils.py:88-92`
+
+### require_editor
+
+Restricts access to editors and administrators only:
+
+```python
+def require_editor(request: Request):
+    return _require_role(request, ["editor", "administrador"])
+```
+
+**Source:** `src/infrastructure/security/jwt_utils.py:95-99`
+
+### require_admin
+
+Restricts access to administrators only:
+
+```python
+def require_admin(request: Request):
+    return _require_role(request, ["administrador"])
+```
+
+**Source:** `src/infrastructure/security/jwt_utils.py:102-106`
+
+<Note>
+These guard functions are used as FastAPI dependencies via `Depends()` in router endpoints to enforce permissions.
+</Note>
+
+## Default Role Assignment
+
+When new users register through the `/auth/register` endpoint, they are automatically assigned the **visitante** role:
+
+```python
+class Usuario:
+    def __init__(self, rol: str = "visitante", ...):
+        self.rol = rol
+```
+
+**Source:** `src/domain/entities/usuario.py:11`
+
+<Warning>
+Only administrators can change user roles via the `PATCH /usuarios/{user_id}/rol` endpoint.
+</Warning>
+
+## Role Modification
+
+Role assignment is restricted to administrators through the `AsignarRol` use case:
+
+```python
+@router.patch("/{user_id}/rol", dependencies=[Depends(require_admin)])
+def asignar_rol(user_id: str, data: dict, db=Depends(get_database)):
+    # Admin-only endpoint to change user roles
+```
+
+**Source:** `src/infrastructure/api/routers/usuario_router.py:202`
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Visitor Role" icon="user" href="/roles/visitor">
+    Learn about visitor capabilities
+  </Card>
+  <Card title="Editor Role" icon="pen-to-square" href="/roles/editor">
+    Explore editor permissions
+  </Card>
+  <Card title="Admin Role" icon="user-shield" href="/roles/admin">
+    Understand admin privileges
+  </Card>
+</CardGroup>

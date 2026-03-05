@@ -1,0 +1,434 @@
+---
+title: Visitor Role
+description: Browse destinations, save favorites, and track your tourism journey
+---
+
+## Overview
+
+The **Visitante** (Visitor) role is the default role for all new users. Visitors can explore destinations and routes, save favorites, track visited POIs, and manage their personal profile. This role provides read-only access to destinations and routes while offering full control over personal tracking features.
+
+<Note>
+The visitor role is identified as `"visitante"` in the database and is the default role assigned during registration.
+</Note>
+
+## Default Role Assignment
+
+All users are automatically assigned the visitor role upon registration:
+
+```python
+class Usuario:
+    def __init__(self, rol: str = "visitante", ...):
+        self.rol = rol  # "admin", "editor", "visitante"
+```
+
+**Source:** `src/domain/entities/usuario.py:11`
+
+## Core Capabilities
+
+Visitors have access to four primary feature areas:
+
+<CardGroup cols={2}>
+  <Card title="Browse Content" icon="compass">
+    View destinations and routes
+  </Card>
+  <Card title="Favorites" icon="heart">
+    Save and manage favorite POIs
+  </Card>
+  <Card title="Track Visits" icon="location-dot">
+    Record visited POIs and completed routes
+  </Card>
+  <Card title="Profile" icon="user">
+    Manage personal account information
+  </Card>
+</CardGroup>
+
+## Browsing Destinations and Routes
+
+Visitors have read-only access to all public destinations and routes:
+
+### View Destinations
+
+```python
+@router.get("/")
+def listar_destinos(db=Depends(get_database)):
+    repo = DestinoRepositoryImpl(db)
+    destinos = repo.obtener_todos()
+    return {"total": len(destinos), "data": destinos}
+```
+
+**Endpoint:** `GET /destinos/`  
+**Source:** `src/infrastructure/api/routers/destinos_router.py:30-34`
+
+### View Routes
+
+```python
+@router.get("/", summary="Listar todas las rutas turísticas")
+def listar_rutas(repo: RutaTuristicaRepositoryImpl = Depends(get_repository)):
+    use_case = ListarRutasTuristicas(repo)
+    rutas = use_case.execute()
+    return rutas
+```
+
+**Endpoint:** `GET /rutas/`  
+**Source:** `src/infrastructure/api/routers/rutas_router.py:65-70`
+
+### View Route Details
+
+```python
+@router.get("/{ruta_id}", summary="Obtener una ruta turística por ID")
+def obtener_ruta(ruta_id: str, repo: RutaTuristicaRepositoryImpl = Depends(get_repository)):
+    use_case = ObtenerRutaTuristica(repo)
+    ruta = use_case.execute(ruta_id)
+    return ruta
+```
+
+**Endpoint:** `GET /rutas/{ruta_id}`  
+**Source:** `src/infrastructure/api/routers/rutas_router.py:50-59`
+
+<Note>
+Browsing endpoints do not require authentication. However, tracking features require a visitor account.
+</Note>
+
+## Favorites Management
+
+Visitors can save POIs as favorites for quick access:
+
+### Add Favorite
+
+```python
+@router.post("/{user_id}/favoritosPOI")
+def agregar_favorito(
+    user_id: str,
+    poi_id: str,
+    db=Depends(get_database),
+    user=Depends(require_user)
+):
+    # Users can only modify their own favorites
+    if user.id != user_id and user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No puedes modificar este usuario")
+    
+    repo = UsuarioRepositoryImpl(db)
+    uc = AgregarFavoritoUseCase(repo)
+    uc.ejecutar(user_id, poi_id)
+    return {"message": "POI agregado a favoritos"}
+```
+
+**Endpoint:** `POST /usuarios/{user_id}/favoritosPOI?poi_id={poi_id}`  
+**Source:** `src/infrastructure/api/routers/usuario_router.py:116-135`
+
+### Remove Favorite
+
+```python
+@router.delete("/{user_id}/favoritosPOI/{poi_id}")
+def quitar_favorito(
+    user_id: str,
+    poi_id: str,
+    db=Depends(get_database),
+    user=Depends(require_user)
+):
+    # Users can only modify their own favorites
+    if user.id != user_id and user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No puedes modificar este usuario")
+    
+    repo = UsuarioRepositoryImpl(db)
+    uc = QuitarFavorito(repo)
+    uc.ejecutar(user_id, poi_id)
+    return {"message": "POI eliminado de favoritos"}
+```
+
+**Endpoint:** `DELETE /usuarios/{user_id}/favoritosPOI/{poi_id}`  
+**Source:** `src/infrastructure/api/routers/usuario_router.py:137-156`
+
+<Warning>
+Users can only manage their own favorites. Attempting to modify another user's favorites will result in a 403 Forbidden error (unless you're an administrator).
+</Warning>
+
+## Tracking Visits
+
+Visitors can track their tourism journey by recording visited POIs and completed routes:
+
+### Register Visited POI
+
+```python
+@router.post("/{user_id}/visitados")
+def registrar_visitado(
+    user_id: str,
+    poi_id: str,
+    db=Depends(get_database),
+    user=Depends(require_user)
+):
+    # Users can only track their own visits
+    if user.id != user_id and user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    repo = UsuarioRepositoryImpl(db)
+    uc = RegistrarPoiVisitado(repo)
+    uc.ejecutar(user_id, poi_id)
+    return {"message": "POI registrado como visitado"}
+```
+
+**Endpoint:** `POST /usuarios/{user_id}/visitados?poi_id={poi_id}`  
+**Source:** `src/infrastructure/api/routers/usuario_router.py:159-178`
+
+### Register Completed Route
+
+```python
+@router.post("/{user_id}/rutasRegister")
+def registrar_ruta(
+    user_id: str,
+    ruta: dict,
+    db=Depends(get_database),
+    user=Depends(require_user)
+):
+    # Users can only track their own routes
+    if user.id != user_id and user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    repo = UsuarioRepositoryImpl(db)
+    uc = RegistrarRutaRecorridaUseCase(repo)
+    uc.ejecutar(user_id, ruta)
+    return {"message": "Ruta registrada correctamente"}
+```
+
+**Endpoint:** `POST /usuarios/{user_id}/rutasRegister`  
+**Source:** `src/infrastructure/api/routers/usuario_router.py:181-200`
+
+**Request Body:** Route object with details about the completed journey.
+
+## Profile Management
+
+Visitors can view and update their personal profile information:
+
+### View Own Profile
+
+```python
+@router.get("/me")
+def get_me(token_data = Depends(get_current_user)):
+    """Devuelve los datos del usuario autenticado."""
+    return {
+        "id": token_data.id,
+        "nombre": token_data.nombre,
+        "email": token_data.email,
+        "rol": token_data.rol
+    }
+```
+
+**Endpoint:** `GET /usuarios/me`  
+**Source:** `src/infrastructure/api/routers/usuario_router.py:24-32`
+
+### View User by ID
+
+```python
+@router.get("/porid/{user_id}")
+def obtener_usuario(user_id: str, db=Depends(get_database), user=Depends(require_user)):
+    # The owner can view their info, admin can view all
+    if user.id != user_id and user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    repo = UsuarioRepositoryImpl(db)
+    usuario = repo.obtener_por_id(user_id)
+    return usuario.__dict__
+```
+
+**Endpoint:** `GET /usuarios/porid/{user_id}`  
+**Source:** `src/infrastructure/api/routers/usuario_router.py:89-102`
+
+### Update Profile
+
+```python
+@router.put("/actualizar/{user_id}")
+def actualizar_usuario(
+    user_id: str,
+    data: dict,
+    token_data = Depends(get_current_user)
+):
+    # Users can update themselves
+    # Only admin can update others
+    if token_data.id != user_id and token_data.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos")
+    
+    nombre = data.get("nombre")
+    email = data.get("email")
+    password = data.get("password")
+    
+    # Only admin can change roles
+    if token_data.rol == "admin":
+        rol = data.get("rol")
+    else:
+        rol = "visitante"
+    
+    usuario_actualizado = actualizar_uc.execute(
+        user_id=user_id,
+        nombre=nombre,
+        email=email,
+        password=password,
+        rol=rol
+    )
+```
+
+**Endpoint:** `PUT /usuarios/actualizar/{user_id}`  
+**Source:** `src/infrastructure/api/routers/usuario_router.py:34-78`
+
+<Note>
+Visitors can update their name, email, and password, but cannot change their own role. Only administrators can assign roles.
+</Note>
+
+## AI-Powered Features
+
+Visitors can access AI-powered route generation and suggestions:
+
+### Generate Route from POI
+
+```python
+@router.post("/generar-desde-poi", summary="Genera automáticamente una ruta a partir de un POI inicial")
+def generar_ruta_desde_poi(
+    data: dict, 
+    destino_repository: DestinoRepositoryImpl = Depends(get_destino_repository)
+):
+    poi_id_inicial = data["poi_id"]
+    use_case = GenerarRutaDesdePOI(destino_repository)
+    ruta_generada = use_case.execute(poi_id_inicial)
+    return ruta_generada
+```
+
+**Endpoint:** `POST /rutas/generar-desde-poi`  
+**Source:** `src/infrastructure/api/routers/rutas_router.py:91-98`
+
+### Get POI Suggestions
+
+```python
+@router.post("/sugerencias", summary="Sugerir el siguiente POI para completar la ruta")
+def sugerir_siguiente_poi(
+    data: dict, 
+    destino_repository: DestinoRepositoryImpl = Depends(get_destino_repository)
+):
+    poi_actual_id = data.get("actual")
+    seleccionados = data.get("seleccionados", [])
+    
+    use_case = SugerirPOIsProximos(destino_repository)
+    sugerencias = use_case.execute(poi_actual_id, seleccionados)
+    
+    return {
+        "actual": poi_actual_id,
+        "seleccionados": seleccionados,
+        "sugerencias": sugerencias
+    }
+```
+
+**Endpoint:** `POST /rutas/sugerencias`  
+**Source:** `src/infrastructure/api/routers/rutas_router.py:135-157`
+
+<Note>
+These AI features do not require authentication and are available to all users.
+</Note>
+
+## Permission Enforcement
+
+Visitor permissions are enforced through the `require_user` dependency:
+
+```python
+def require_user(request: Request):
+    """
+    Usuario autenticado (cualquier rol excepto visitante no registrado).
+    """
+    return _require_role(request, ["visitante", "editor", "administrador"])
+```
+
+**Source:** `src/infrastructure/security/jwt_utils.py:88-92`
+
+<Note>
+This dependency allows any authenticated user (visitor, editor, or administrator) to access the endpoint.
+</Note>
+
+## Visitor-Accessible Endpoints
+
+The following endpoints are available to authenticated visitors:
+
+| Endpoint | Method | Purpose |
+|----------|--------|----------|
+| `/destinos/` | GET | List all destinations |
+| `/rutas/` | GET | List all routes |
+| `/rutas/{ruta_id}` | GET | View route details |
+| `/usuarios/me` | GET | View own profile |
+| `/usuarios/porid/{user_id}` | GET | View user profile (own only) |
+| `/usuarios/actualizar/{user_id}` | PUT | Update profile (own only) |
+| `/usuarios/{user_id}/favoritosPOI` | POST | Add favorite POI |
+| `/usuarios/{user_id}/favoritosPOI/{poi_id}` | DELETE | Remove favorite POI |
+| `/usuarios/{user_id}/visitados` | POST | Register visited POI |
+| `/usuarios/{user_id}/rutasRegister` | POST | Register completed route |
+| `/rutas/generar-desde-poi` | POST | Generate AI route |
+| `/rutas/sugerencias` | POST | Get POI suggestions |
+
+## Prohibited Operations
+
+Visitors **cannot** perform the following operations:
+
+<Warning>
+**Editor/Admin-Only Operations:**
+- Create, edit, or delete destinations
+- Create, edit, or delete routes
+- Toggle destination status
+- Upload or delete multimedia
+- View all users
+- Manage other users' accounts
+- Assign roles
+</Warning>
+
+## Common Workflows
+
+### Planning a Trip
+
+1. Browse destinations via `GET /destinos/`
+2. View specific routes via `GET /rutas/`
+3. Generate custom route via `POST /rutas/generar-desde-poi`
+4. Save favorite POIs via `POST /usuarios/{user_id}/favoritosPOI`
+
+### Tracking Your Journey
+
+1. Visit a destination in real life
+2. Register the visit via `POST /usuarios/{user_id}/visitados`
+3. Complete a route
+4. Register completion via `POST /usuarios/{user_id}/rutasRegister`
+
+## Entity Structure
+
+The `Usuario` entity includes visitor-specific tracking fields:
+
+```python
+class Usuario:
+    def __init__(
+        self,
+        id: str,
+        nombre: str,
+        email: str,
+        password_hash: str,
+        rol: str = "visitante",
+        favoritos: Optional[List] = None,
+        rutas_recorridas: Optional[List] = None,
+        pois_visitados: Optional[List] = None,
+        fecha_creacion: Optional[datetime] = None,
+    ):
+        self.favoritos = favoritos or []          # Favorite POIs
+        self.rutas_recorridas = rutas_recorridas or []  # Completed routes
+        self.pois_visitados = pois_visitados or []      # Visited POIs
+```
+
+**Source:** `src/domain/entities/usuario.py:5-25`
+
+## Best Practices
+
+<Note>
+**Visitor Tips:**
+- Register an account to unlock tracking features
+- Use favorites to build custom itineraries
+- Track visits to monitor your progress
+- Leverage AI route generation for personalized experiences
+</Note>
+
+## Related Documentation
+
+- [User Roles Overview](/roles/overview)
+- [Editor Role](/roles/editor)
+- [Administrator Role](/roles/admin)
+- [Authentication](/api/auth/register)
+- [User Management](/api/users/update)

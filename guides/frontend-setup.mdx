@@ -1,0 +1,274 @@
+---
+title: 'Frontend Setup'
+description: 'Set up and run the React frontend with Vite dev server'
+icon: 'react'
+---
+
+## Overview
+
+The Tesis Rutas frontend is built with **React 19**, **Vite**, and **Leaflet** for interactive mapping. It uses Tailwind CSS for styling and Radix UI for accessible components.
+
+## Prerequisites
+
+- Node.js 18+ and npm installed
+- Backend API running on `http://localhost:8000`
+
+## Installation
+
+<Steps>
+  <Step title="Navigate to frontend directory">
+    ```bash
+    cd frontend
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    npm install
+    ```
+
+    This installs:
+    - **React 19** - UI framework
+    - **Vite** - Fast build tool and dev server
+    - **Leaflet** - Interactive mapping library
+    - **React Router** - Client-side routing
+    - **Axios** - HTTP client
+    - **Tailwind CSS** - Utility-first CSS framework
+    - **Radix UI** - Accessible component primitives
+  </Step>
+
+  <Step title="Start development server">
+    ```bash
+    npm run dev
+    ```
+
+    The app will be available at **http://localhost:5173**
+  </Step>
+</Steps>
+
+## Project Structure
+
+The frontend follows a feature-based architecture:
+
+```
+frontend/src/
+├── api/                    # API client modules
+│   ├── auth/              # Authentication endpoints
+│   ├── destinos/          # Destinations (POIs) endpoints
+│   ├── pois/              # Points of Interest endpoints
+│   ├── rutas/             # Routes endpoints
+│   └── usuarios/          # Users endpoints
+├── components/            # Reusable components
+│   ├── Mapa/             # Map components (Leaflet)
+│   │   ├── MapView.jsx   # Main map container
+│   │   ├── MapaBase.jsx  # Base map configuration
+│   │   └── MapaSidebar.jsx
+│   ├── Navbar/
+│   ├── Footer/
+│   └── ui/               # Radix UI components
+├── context/              # React Context providers
+│   ├── AuthContext/
+│   └── DestinosContext/
+├── features/             # Feature modules
+│   └── mapa/            # Map-specific features
+│       ├── adapters/
+│       ├── hooks/
+│       └── pages/
+├── hooks/                # Custom React hooks
+│   ├── useDestinos/
+│   ├── useRutas/
+│   ├── useOSRMRoute/     # OSRM routing integration
+│   └── useUserLocation/
+├── layouts/              # Page layouts
+│   └── MainLayout/
+├── pages/                # Page components
+│   ├── Home/
+│   ├── auth/
+│   ├── destinos/
+│   ├── rutas/
+│   └── usuario/
+├── router/               # Route configuration
+│   └── AppRouter/
+├── lib/                  # Utilities
+│   ├── campusRouter/     # Campus routing logic
+│   └── geo/              # Geospatial utilities
+├── styles/               # Global styles
+├── App.jsx               # Root component
+└── main.jsx              # Application entry point
+```
+
+## Key Components
+
+### Leaflet Map Setup
+
+The map components use **react-leaflet** to render interactive maps:
+
+```jsx frontend/src/components/Mapa/MapView.jsx
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+
+// Fix Leaflet icons in Vite
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+function MapView() {
+  return (
+    <MapContainer 
+      center={[-0.2186, -78.5097]} 
+      zoom={13}
+      className="h-full w-full"
+    >
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; OpenStreetMap contributors'
+      />
+      <Marker position={[-0.2186, -78.5097]}>
+        <Popup>Universidad Central del Ecuador</Popup>
+      </Marker>
+    </MapContainer>
+  );
+}
+```
+
+<Warning>
+  Leaflet icons don't work out-of-the-box with Vite. You must delete the default icon URL and manually set the CDN paths as shown above.
+</Warning>
+
+### Main Entry Point
+
+The application bootstraps in `main.jsx`:
+
+```jsx frontend/src/main.jsx
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './styles/index.css'
+import App from './App.jsx'
+import { AuthProvider } from './context/AuthContext'
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  </StrictMode>
+)
+```
+
+## Available Scripts
+
+<CodeGroup>
+
+```bash Development Server
+npm run dev
+# Starts Vite dev server on port 5173
+# Hot reload enabled
+```
+
+```bash Build for Production
+npm run build
+# Creates optimized production build in dist/
+```
+
+```bash Preview Production Build
+npm run preview
+# Preview production build locally
+```
+
+```bash Lint Code
+npm run lint
+# Run ESLint to check code quality
+```
+
+</CodeGroup>
+
+## Development Workflow
+
+### Hot Reload
+
+Vite provides instant hot module replacement (HMR). Changes to React components update automatically without full page reload.
+
+### API Integration
+
+The frontend expects the backend API at `http://localhost:8000`. Ensure it's running before starting the dev server.
+
+```jsx Example API call
+import axios from 'axios';
+
+const api = axios.create({
+  baseURL: 'http://localhost:8000'
+});
+
+export const getDestinos = async () => {
+  const response = await api.get('/destinos/');
+  return response.data;
+};
+```
+
+### Environment Variables
+
+Create a `.env` file in the frontend directory:
+
+```bash .env
+VITE_API_URL=http://localhost:8000
+```
+
+Access in code:
+
+```jsx
+const apiUrl = import.meta.env.VITE_API_URL;
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Port 5173 already in use">
+    Kill the existing process:
+    ```bash
+    lsof -ti:5173 | xargs kill -9
+    ```
+    Or change the port in `vite.config.js`:
+    ```js
+    export default defineConfig({
+      server: { port: 3000 }
+    })
+    ```
+  </Accordion>
+
+  <Accordion title="Map tiles not loading">
+    Check your internet connection. Leaflet tiles are loaded from OpenStreetMap CDN.
+    
+    Alternative tile provider:
+    ```jsx
+    <TileLayer
+      url="https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png"
+    />
+    ```
+  </Accordion>
+
+  <Accordion title="CORS errors when calling API">
+    Ensure the backend has CORS configured for `http://localhost:5173`.
+    
+    Check `src/infrastructure/api/main.py`:
+    ```python
+    origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Backend Setup" icon="server" href="/guides/backend-setup">
+    Learn how to run the FastAPI backend
+  </Card>
+  <Card title="Database Setup" icon="database" href="/guides/database-setup">
+    Configure MongoDB for local development
+  </Card>
+</CardGroup>

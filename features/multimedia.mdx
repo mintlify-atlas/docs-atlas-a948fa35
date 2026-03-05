@@ -1,0 +1,440 @@
+---
+title: 'Multimedia Management'
+description: 'Upload and manage images and videos for heritage sites via Cloudinary integration'
+icon: 'images'
+---
+
+## Overview
+
+Tesis Rutas integrates with Cloudinary for robust multimedia storage and delivery. Each destination can store up to **10 multimedia files** (images or videos) with automatic metadata extraction and optimized delivery.
+
+<Warning>
+  **Hard Limit**: Each destination is restricted to a maximum of 10 multimedia files. This limit is enforced at the API level.
+</Warning>
+
+## Multimedia Entity
+
+The `Multimedia` entity (src/domain/entities/multimedia.py) represents a single media file:
+
+```python Multimedia Entity
+class Multimedia:
+    def __init__(
+        self,
+        destino_id: str,           # Parent destination ID
+        url: str,                  # Cloudinary secure URL
+        tipo: str,                 # "image" or "video"
+        public_id: str,            # Cloudinary public_id for deletion
+        formato: Optional[str] = None,         # e.g., "jpg", "mp4"
+        tamanio_bytes: Optional[int] = None,   # File size
+        anchura: Optional[int] = None,         # Width (pixels)
+        altura: Optional[int] = None,          # Height (pixels)
+        id: Optional[str] = None,
+        fecha_creacion: Optional[datetime] = None,
+        activo: bool = True,
+        duracion: Optional[float] = None       # Video duration (seconds)
+    )
+```
+
+### Storage Structure
+
+```python MongoDB Document
+def to_dict(self) -> dict:
+    return {
+        "_id": self.id,
+        "destino_id": self.destino_id,
+        "url": self.url,
+        "tipo": self.tipo,
+        "public_id": self.public_id,
+        "formato": self.formato,
+        "tamanio_bytes": self.tamanio_bytes,
+        "anchura": self.anchura,
+        "altura": self.altura,
+        "fecha_creacion": self.fecha_creacion,
+        "activo": self.activo,
+        "duracion": self.duracion,
+    }
+```
+
+## Cloudinary Configuration
+
+Cloudinary setup is handled in `src/infrastructure/services/cloudinary_config.py`. Files are organized by destination:
+
+```
+Cloudinary Folder Structure:
+└── destinations/
+    ├── {destino_id_1}/
+    │   ├── image_1.jpg
+    │   ├── image_2.png
+    │   └── video_1.mp4
+    └── {destino_id_2}/
+        └── image_1.jpg
+```
+
+## API Endpoints
+
+### Upload Multimedia
+
+**POST** `/destinos/{id}/multimedia`
+
+Requires: Admin role
+
+<Accordion title="Upload Constraints">
+  - **Per Request**: 1-3 files maximum
+  - **Per Destination**: 10 files total (cumulative)
+  - **Supported Types**: Images (JPEG, PNG, GIF, WebP) and Videos (MP4, MOV, etc.)
+  - **Auto Detection**: Cloudinary automatically detects resource type
+</Accordion>
+
+```python Endpoint Implementation
+@router.post("/{id}/multimedia")
+async def subir_multimedia_destino(
+    id: str,
+    files: List[UploadFile] = File(...),
+    db=Depends(get_database),
+    admin=Depends(require_admin)
+):
+    # Validate request file count (1-3)
+    if len(files) == 0 or len(files) > 3:
+        raise HTTPException(
+            status_code=400,
+            detail="Debes subir entre 1 y 3 archivos por solicitud."
+        )
+
+    repo = DestinoRepositoryImpl(db)
+    destino = repo.obtener_por_id(id)
+    if not destino:
+        raise HTTPException(status_code=404, detail="Destino no encontrado")
+
+    multimedia_actual = destino.get("multimedia", [])
+    total_actual = len(multimedia_actual)
+
+    # Validate global 10-file limit
+    if total_actual >= 10:
+        raise HTTPException(
+            status_code=400,
+            detail="El destino ya tiene el máximo permitido de 10 archivos."
+        )
+
+    if total_actual + len(files) > 10:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Solo puedes subir {10 - total_actual} archivos adicionales."
+        )
+```
+
+### Upload Process
+
+<Steps>
+  <Step title="Validate Limits">
+    Check that the upload won't exceed the 10-file limit for the destination.
+  </Step>
+  
+  <Step title="Upload to Cloudinary">
+    Use async upload for all files in parallel:
+    
+    ```python Async Upload
+    async def upload_async(file: UploadFile):
+        file_bytes = await file.read()
+        return await asyncio.to_thread(
+            cloudinary.uploader.upload,
+            file_bytes,
+            folder=f"destinations/{id}",
+            resource_type="auto"  # Auto-detect image vs video
+        )
+
+    resultados_cloudinary = await asyncio.gather(*[
+        upload_async(file) for file in files
+    ])
+    ```
+  </Step>
+  
+  <Step title="Extract Metadata">
+    Create `Multimedia` entities from Cloudinary response:
+    
+    ```python Metadata Extraction
+    for data in resultados_cloudinary:
+        tipo = data.get("resource_type")
+
+        item = Multimedia(
+            destino_id=id,
+            url=data.get("secure_url"),
+            public_id=data.get("public_id"),
+            tipo=tipo,
+            formato=data.get("format"),
+            tamanio_bytes=data.get("bytes"),
+            anchura=data.get("width"),
+            altura=data.get("height"),
+            duracion=data.get("duration") if tipo == "video" else None
+        )
+    ```
+  </Step>
+  
+  <Step title="Save to Database">
+    Use `AgregarMultimediaDestinoUseCase` to persist metadata.
+  </Step>
+  
+  <Step title="Rollback on Failure">
+    If database save fails, automatically delete uploaded files from Cloudinary:
+    
+    ```python Rollback Logic
+    except Exception as e:
+        # Delete from Cloudinary
+        for pid in public_ids_subidos:
+            try:
+                cloudinary.uploader.destroy(pid)
+            except:
+                pass
+
+        raise HTTPException(
+            status_code=500,
+            detail="Error al guardar multimedia, las subidas fueron revertidas."
+        )
+    ```
+  </Step>
+</Steps>
+
+### Delete Multimedia
+
+**DELETE** `/destinos/{id}/multimedia?public_id={public_id}`
+
+Requires: Admin role
+
+```python Delete Endpoint
+@router.delete("/{id}/multimedia")
+async def eliminar_multimedia_destino(
+    id: str,
+    public_id: str,  # Query parameter
+    db=Depends(get_database),
+    admin=Depends(require_admin)
+):
+    repo = DestinoRepositoryImpl(db)
+    
+    # Validate destination and file existence
+    destino = repo.obtener_por_id(id)
+    if not destino:
+        raise HTTPException(status_code=404, detail="Destino no encontrado")
+
+    multimedia_actual = destino.get("multimedia", [])
+    archivo = next((m for m in multimedia_actual if m["public_id"] == public_id), None)
+    if not archivo:
+        raise HTTPException(status_code=404, detail="Archivo no existe")
+
+    tipo_cloudinary = archivo.get("tipo", "image")
+
+    # Delete from database first
+    use_case = EliminarMultimediaDestinoUseCase(repo)
+    eliminado_db = await use_case.execute(id, public_id)
+
+    if not eliminado_db:
+        raise HTTPException(status_code=500, detail="Error al eliminar de BD")
+
+    # Then delete from Cloudinary
+    try:
+        cloudinary.uploader.destroy(public_id, resource_type=tipo_cloudinary)
+    except Exception as e:
+        return {
+            "message": "Archivo eliminado de BD. Error al borrar de Cloudinary.",
+            "error_cloudinary": str(e)
+        }
+
+    return {
+        "message": "Multimedia eliminada correctamente",
+        "public_id": public_id
+    }
+```
+
+<Note>
+  Deletion follows a "database-first" approach. If Cloudinary deletion fails, the file is orphaned in cloud storage but removed from the app.
+</Note>
+
+## Upload Examples
+
+### Single Image Upload
+
+```bash cURL Example
+curl -X POST "https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011/multimedia" \
+  -H "Authorization: Bearer {admin_token}" \
+  -F "files=@catedral_front.jpg"
+```
+
+**Response:**
+```json
+{
+  "message": "Multimedia agregada correctamente",
+  "total_actual": 1,
+  "archivos": [
+    {
+      "_id": "507f1f77bcf86cd799439020",
+      "destino_id": "507f1f77bcf86cd799439011",
+      "url": "https://res.cloudinary.com/tesisrutas/image/upload/v1234567890/destinations/507f1f77bcf86cd799439011/catedral_front.jpg",
+      "tipo": "image",
+      "public_id": "destinations/507f1f77bcf86cd799439011/catedral_front",
+      "formato": "jpg",
+      "tamanio_bytes": 2458624,
+      "anchura": 1920,
+      "altura": 1080,
+      "fecha_creacion": "2026-03-05T21:00:00Z",
+      "activo": true,
+      "duracion": null
+    }
+  ]
+}
+```
+
+### Multiple Files Upload
+
+```bash cURL Example
+curl -X POST "https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011/multimedia" \
+  -H "Authorization: Bearer {admin_token}" \
+  -F "files=@image1.jpg" \
+  -F "files=@image2.png" \
+  -F "files=@tour_video.mp4"
+```
+
+### Delete Multimedia
+
+```bash cURL Example
+curl -X DELETE "https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011/multimedia?public_id=destinations/507f1f77bcf86cd799439011/catedral_front" \
+  -H "Authorization: Bearer {admin_token}"
+```
+
+## Validation Rules
+
+<CardGroup cols={2}>
+  <Card title="10 Files Maximum" icon="file-image">
+    Hard limit per destination - enforced before Cloudinary upload to prevent quota waste
+  </Card>
+  
+  <Card title="1-3 Files per Request" icon="upload">
+    Batch upload limit to prevent timeout and improve error handling
+  </Card>
+  
+  <Card title="Auto Resource Detection" icon="wand-magic">
+    Cloudinary automatically detects image vs video - no need to specify type
+  </Card>
+  
+  <Card title="Atomic Transactions" icon="rotate-left">
+    Upload failures trigger automatic Cloudinary rollback to maintain consistency
+  </Card>
+</CardGroup>
+
+## Destination Deletion Protection
+
+Destinations with multimedia cannot be permanently deleted:
+
+```python Delete Protection
+@router.delete("/{destino_id}/force")
+def eliminar_destino_fisico(destino_id: str, ...):
+    destino = repo.obtener_por_id(destino_id)
+    
+    # Validate no multimedia exists
+    multimedia_actual = destino.get("multimedia", [])
+    if multimedia_actual:
+        raise HTTPException(
+            status_code=400,
+            detail="Este destino tiene archivos multimedia. Elimínelos primero."
+        )
+    
+    # Proceed with deletion...
+```
+
+<Accordion title="Why This Restriction?">
+  This design prevents orphaned Cloudinary files and ensures data integrity:
+  
+  1. Admin must explicitly delete each multimedia file
+  2. Cloudinary cleanup happens during multimedia deletion
+  3. Destination deletion is only allowed when `multimedia = []`
+  4. Empty destination folders are removed during final deletion
+  
+  This multi-step process ensures no cloud storage waste and clear audit trails.
+</Accordion>
+
+## Cloudinary Folder Management
+
+When a destination is permanently deleted, its Cloudinary folder is removed:
+
+```python Folder Cleanup
+ruta_carpeta = f"destinations/{destino_id}"
+
+try:
+    cloudinary.api.delete_folder(ruta_carpeta)
+except Exception as e:
+    return {
+        "message": "Destino eliminado de BD, error al borrar carpeta Cloudinary.",
+        "cloudinary_error": str(e)
+    }
+```
+
+## Supported Formats
+
+Cloudinary accepts a wide range of formats via `resource_type="auto"`:
+
+### Images
+- JPEG (.jpg, .jpeg)
+- PNG (.png)
+- GIF (.gif)
+- WebP (.webp)
+- TIFF (.tiff)
+- BMP (.bmp)
+- SVG (.svg)
+
+### Videos
+- MP4 (.mp4)
+- MOV (.mov)
+- AVI (.avi)
+- WebM (.webm)
+- FLV (.flv)
+- MKV (.mkv)
+
+<Note>
+  Cloudinary automatically optimizes images for web delivery. Videos are transcoded for streaming compatibility.
+</Note>
+
+## Best Practices
+
+<Steps>
+  <Step title="Optimize Before Upload">
+    While Cloudinary handles optimization, pre-compressing large files reduces upload time and bandwidth.
+  </Step>
+  
+  <Step title="Use Descriptive Filenames">
+    Filenames become part of the Cloudinary URL - use clear, SEO-friendly names.
+  </Step>
+  
+  <Step title="Plan Multimedia Usage">
+    With a 10-file limit, prioritize high-quality, representative images of the heritage site.
+  </Step>
+  
+  <Step title="Delete Unused Files">
+    Remove outdated or low-quality media to make room for better content.
+  </Step>
+  
+  <Step title="Monitor Storage Quotas">
+    Track Cloudinary account usage to avoid hitting plan limits.
+  </Step>
+</Steps>
+
+## Error Handling
+
+### Common Upload Errors
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| 400 - File count invalid | Uploading 0 or >3 files | Send 1-3 files per request |
+| 400 - Limit exceeded | Destination already has 10 files | Delete existing files first |
+| 404 - Destination not found | Invalid destination ID | Verify destination exists |
+| 500 - Upload failed | Cloudinary error | Check network and Cloudinary status |
+| 500 - Rollback triggered | Database save failed | Files removed from Cloudinary automatically |
+
+### Common Deletion Errors
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| 404 - File not found | Invalid public_id | Verify public_id from destination data |
+| 500 - Cloudinary delete failed | Network/API error | File removed from DB but orphaned in cloud |
+
+## Related Features
+
+- [Destinations](/features/destinations) - Parent entity for multimedia
+- [API Reference - Multimedia](/api/destinos/multimedia) - Complete API documentation
+- [Cloudinary Transformations](https://cloudinary.com/documentation/image_transformations) - Advanced media optimization

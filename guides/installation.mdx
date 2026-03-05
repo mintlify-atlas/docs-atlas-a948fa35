@@ -1,0 +1,175 @@
+---
+title: 'Installation'
+description: 'Set up the Tesis Rutas development environment'
+icon: 'download'
+---
+
+This guide will walk you through installing all prerequisites and dependencies for the Tesis Rutas platform.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed on your system:
+
+<Steps>
+  <Step title="Python 3.8 or higher">
+    Verify your Python installation:
+    ```bash
+    python --version
+    # or
+    python3 --version
+    ```
+    
+    If Python is not installed, download it from [python.org](https://www.python.org/downloads/)
+  </Step>
+
+  <Step title="Node.js 18 or higher">
+    Verify your Node.js installation:
+    ```bash
+    node --version
+    ```
+    
+    If Node.js is not installed, download it from [nodejs.org](https://nodejs.org/)
+  </Step>
+
+  <Step title="Git">
+    Verify Git is installed:
+    ```bash
+    git --version
+    ```
+    
+    If Git is not installed, download it from [git-scm.com](https://git-scm.com/)
+  </Step>
+</Steps>
+
+## Clone the Repository
+
+Clone the Tesis Rutas repository to your local machine:
+
+```bash
+git clone <repository-url>
+cd tesis-rutas
+```
+
+<Note>
+  Replace `<repository-url>` with the actual repository URL provided by your team.
+</Note>
+
+## Backend Setup
+
+The backend is built with FastAPI and requires Python dependencies.
+
+<Steps>
+  <Step title="Create a virtual environment (recommended)">
+    Create and activate a Python virtual environment:
+    
+    <CodeGroup>
+      ```bash macOS/Linux
+      python -m venv venv
+      source venv/bin/activate
+      ```
+      
+      ```bash Windows
+      python -m venv venv
+      venv\Scripts\activate
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Install Python dependencies">
+    Install all required packages from `requirements.txt`:
+    ```bash
+    pip install -r requirements.txt
+    ```
+    
+    This will install:
+    - **FastAPI 0.121.1** - Modern web framework
+    - **Uvicorn 0.38.0** - ASGI server
+    - **PyMongo 4.15.3** - MongoDB driver
+    - **Cloudinary 1.44.1** - Media management
+    - **python-jose 3.5.0** - JWT authentication
+    - **bcrypt 5.0.0** - Password hashing
+    - **Pydantic 2.12.4** & **pydantic-settings 2.11.0** - Configuration management
+    - And other supporting libraries
+  </Step>
+
+  <Step title="Verify installation">
+    Check that FastAPI is installed correctly:
+    ```bash
+    python -c "import fastapi; print(fastapi.__version__)"
+    ```
+  </Step>
+</Steps>
+
+## Frontend Setup
+
+The frontend is built with React, Vite, and Tailwind CSS.
+
+<Steps>
+  <Step title="Navigate to frontend directory">
+    ```bash
+    cd frontend
+    ```
+  </Step>
+
+  <Step title="Install Node.js dependencies">
+    Install all required packages:
+    ```bash
+    npm install
+    ```
+    
+    This will install:
+    - **React 19.2.0** - UI library
+    - **Vite 7.2.4** - Build tool
+    - **React Router 7.10.1** - Client-side routing
+    - **Tailwind CSS 4.1.18** - Utility-first CSS
+    - **Leaflet 1.9.4** & **react-leaflet 5.0.0** - Interactive maps
+    - **Axios 1.13.2** - HTTP client
+    - **Radix UI components** - Accessible UI primitives
+    - **Lucide React 0.561.0** - Icon library
+    - And other UI/utility libraries
+  </Step>
+
+  <Step title="Verify installation">
+    Check that the installation was successful:
+    ```bash
+    npm list react vite
+    ```
+  </Step>
+</Steps>
+
+## Verify Installation
+
+After completing the setup, verify everything is working:
+
+<Steps>
+  <Step title="Test backend imports">
+    From the root directory:
+    ```bash
+    python -c "from src.config.settings import get_settings; print('Backend ready!')"
+    ```
+  </Step>
+
+  <Step title="Test frontend build">
+    From the frontend directory:
+    ```bash
+    npm run build
+    ```
+    
+    This should complete without errors.
+  </Step>
+</Steps>
+
+<Note>
+  Before running the application, you need to configure environment variables. Continue to the [Configuration](/guides/configuration) guide.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Set up environment variables and external services
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/guides/deployment">
+    Deploy your application to production
+  </Card>
+</CardGroup>

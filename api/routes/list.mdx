@@ -1,0 +1,129 @@
+---
+title: "List Routes"
+api: "GET /rutas"
+description: "Get all tourist routes in the system"
+---
+
+Retrieves a list of all tourist routes stored in the database, including their POIs and metadata.
+
+## Authentication
+
+No authentication required. This is a public endpoint.
+
+<ResponseField name="routes" type="array">
+  Array of route objects
+  
+  <ResponseField name="_id" type="string">
+    Unique route identifier
+  </ResponseField>
+  
+  <ResponseField name="nombre" type="string">
+    Name of the route
+  </ResponseField>
+  
+  <ResponseField name="descripcion" type="string">
+    Description of the route
+  </ResponseField>
+  
+  <ResponseField name="categoria" type="string">
+    Route category (Cultural, Historical, Natural, etc.)
+  </ResponseField>
+  
+  <ResponseField name="puntos" type="array">
+    Ordered array of POI references
+    
+    <ResponseField name="poi_id" type="string">
+      ID of the POI
+    </ResponseField>
+    
+    <ResponseField name="order" type="integer">
+      Position in the route (0-indexed)
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="creado_en" type="string">
+    ISO 8601 timestamp of route creation
+  </ResponseField>
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.tesisrutas.com/rutas
+```
+
+```python Python
+import requests
+
+url = "https://api.tesisrutas.com/rutas"
+response = requests.get(url)
+rutas = response.json()
+
+for ruta in rutas:
+    print(f"{ruta['nombre']} - {len(ruta['puntos'])} POIs")
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.tesisrutas.com/rutas');
+const rutas = await response.json();
+
+rutas.forEach(ruta => {
+  console.log(`${ruta.nombre} - ${ruta.puntos.length} POIs`);
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Response
+[
+  {
+    "_id": "507f1f77bcf86cd799439020",
+    "nombre": "Ruta Colonial del Centro Histórico",
+    "descripcion": "Recorrido por los principales monumentos coloniales",
+    "categoria": "Cultural",
+    "puntos": [
+      {
+        "poi_id": "507f1f77bcf86cd799439011",
+        "order": 0
+      },
+      {
+        "poi_id": "507f1f77bcf86cd799439012",
+        "order": 1
+      },
+      {
+        "poi_id": "507f1f77bcf86cd799439013",
+        "order": 2
+      }
+    ],
+    "creado_en": "2024-03-15T10:30:00Z"
+  },
+  {
+    "_id": "507f1f77bcf86cd799439021",
+    "nombre": "Ruta de las Iglesias",
+    "descripcion": "Tour por las iglesias históricas de la ciudad",
+    "categoria": "Religioso",
+    "puntos": [
+      {
+        "poi_id": "507f1f77bcf86cd799439015",
+        "order": 0
+      },
+      {
+        "poi_id": "507f1f77bcf86cd799439016",
+        "order": 1
+      }
+    ],
+    "creado_en": "2024-03-14T14:20:00Z"
+  }
+]
+```
+
+</ResponseExample>
+
+## Response Details
+
+- Routes are returned as stored in the database
+- POIs are ordered by the `order` field within each route
+- Empty array `[]` is returned if no routes exist
+- Includes both active and inactive routes

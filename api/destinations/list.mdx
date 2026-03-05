@@ -1,0 +1,210 @@
+---
+title: 'List Destinations'
+api: 'GET /destinos'
+description: 'Retrieve all active heritage sites (destinations) in the system'
+---
+
+## Authentication
+
+**Required Role:** None (Public endpoint)
+
+This endpoint is publicly accessible and does not require authentication.
+
+## Response
+
+<ResponseField name="total" type="number">
+  Total count of active destinations
+</ResponseField>
+
+<ResponseField name="data" type="array">
+  Array of destination objects
+  
+  <ResponseField name="data[]._id" type="string">
+    MongoDB ObjectId of the destination
+  </ResponseField>
+  
+  <ResponseField name="data[].nombre" type="string">
+    Name of the heritage site
+  </ResponseField>
+  
+  <ResponseField name="data[].ubicacion" type="string">
+    Location or address
+  </ResponseField>
+  
+  <ResponseField name="data[].importancia" type="string">
+    Historical or cultural significance
+  </ResponseField>
+  
+  <ResponseField name="data[].coordenadas" type="object">
+    Geographic coordinates
+    
+    <ResponseField name="data[].coordenadas.latitud" type="number">
+      Latitude
+    </ResponseField>
+    
+    <ResponseField name="data[].coordenadas.longitud" type="number">
+      Longitude
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="data[].anio_construccion" type="array">
+    Year(s) of construction (1 or 2 values)
+  </ResponseField>
+  
+  <ResponseField name="data[].arquitecto" type="string">
+    Architect name (if available)
+  </ResponseField>
+  
+  <ResponseField name="data[].area_construccion" type="number">
+    Construction area in square meters (if available)
+  </ResponseField>
+  
+  <ResponseField name="data[].funcion" type="string">
+    Function of the site (if available)
+  </ResponseField>
+  
+  <ResponseField name="data[].multimedia" type="array">
+    Array of multimedia files associated with this destination
+    
+    <ResponseField name="data[].multimedia[].url" type="string">
+      Cloudinary secure URL for the file
+    </ResponseField>
+    
+    <ResponseField name="data[].multimedia[].public_id" type="string">
+      Cloudinary public ID
+    </ResponseField>
+    
+    <ResponseField name="data[].multimedia[].tipo" type="string">
+      File type: "image" or "video"
+    </ResponseField>
+    
+    <ResponseField name="data[].multimedia[].formato" type="string">
+      File format (e.g., "jpg", "png", "mp4")
+    </ResponseField>
+    
+    <ResponseField name="data[].multimedia[].tamanio_bytes" type="number">
+      File size in bytes
+    </ResponseField>
+    
+    <ResponseField name="data[].multimedia[].anchura" type="number">
+      Width in pixels (for images/videos)
+    </ResponseField>
+    
+    <ResponseField name="data[].multimedia[].altura" type="number">
+      Height in pixels (for images/videos)
+    </ResponseField>
+    
+    <ResponseField name="data[].multimedia[].duracion" type="number">
+      Duration in seconds (for videos only)
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="data[].fecha_creacion" type="string">
+    ISO 8601 timestamp of creation
+  </ResponseField>
+  
+  <ResponseField name="data[].activo" type="boolean">
+    Always true (only active destinations are returned)
+  </ResponseField>
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.tesisrutas.com/destinos
+```
+
+```python Python
+import requests
+
+url = "https://api.tesisrutas.com/destinos"
+response = requests.get(url)
+
+data = response.json()
+print(f"Total destinations: {data['total']}")
+for destino in data['data']:
+    print(f"- {destino['nombre']} ({destino['ubicacion']})")
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.tesisrutas.com/destinos');
+const data = await response.json();
+
+console.log(`Total destinations: ${data.total}`);
+data.data.forEach(destino => {
+  console.log(`- ${destino.nombre} (${destino.ubicacion})`);
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "total": 2,
+  "data": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "nombre": "Catedral de Lima",
+      "ubicacion": "Plaza Mayor, Lima Centro",
+      "importancia": "Principal templo católico del Perú, construcción colonial",
+      "coordenadas": {
+        "latitud": -12.046374,
+        "longitud": -77.030090
+      },
+      "anio_construccion": [1535, 1649],
+      "arquitecto": "Francisco Becerra",
+      "area_construccion": 8900,
+      "funcion": "Templo religioso y sede arquidiocesana",
+      "multimedia": [
+        {
+          "url": "https://res.cloudinary.com/.../cathedral_front.jpg",
+          "public_id": "destinations/507f1f77bcf86cd799439011/cathedral_front",
+          "tipo": "image",
+          "formato": "jpg",
+          "tamanio_bytes": 2456789,
+          "anchura": 1920,
+          "altura": 1080
+        }
+      ],
+      "fecha_creacion": "2024-01-15T10:30:00.000Z",
+      "activo": true
+    },
+    {
+      "_id": "507f1f77bcf86cd799439012",
+      "nombre": "Convento de San Francisco",
+      "ubicacion": "Jr. Ancash 471, Lima",
+      "importancia": "Complejo religioso colonial con catacumbas históricas",
+      "coordenadas": {
+        "latitud": -12.046100,
+        "longitud": -77.028500
+      },
+      "anio_construccion": [1546],
+      "arquitecto": null,
+      "area_construccion": null,
+      "funcion": "Museo y templo religioso",
+      "multimedia": [],
+      "fecha_creacion": "2024-01-16T14:22:00.000Z",
+      "activo": true
+    }
+  ]
+}
+```
+
+</ResponseExample>
+
+## Implementation Details
+
+This endpoint:
+1. Queries the `sitios_patrimoniales` collection with filter `{"activo": true}`
+2. Returns only destinations marked as active
+3. Converts MongoDB ObjectIds to strings for JSON serialization
+4. Includes all associated multimedia files in the response
+
+**Filter Behavior:**
+- Only destinations with `activo: true` are returned
+- Deactivated destinations (toggled via `/estado/{id}`) are excluded
+- No pagination is currently implemented
+
+**Source:** `destinos_router.py:30-34`

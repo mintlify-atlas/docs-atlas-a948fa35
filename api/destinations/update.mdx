@@ -1,0 +1,240 @@
+---
+title: 'Update Destination'
+api: 'PUT /destinos/{id}'
+description: 'Update an existing heritage site or toggle its active status'
+---
+
+## Update Destination Data
+
+<ParamField path="id" type="string" required>
+  MongoDB ObjectId of the destination to update
+</ParamField>
+
+### Authentication
+
+**Required Role:** Admin
+
+### Request Body
+
+All fields are optional. Only provided fields will be updated.
+
+<ParamField body="nombre" type="string">
+  Name of the heritage site
+</ParamField>
+
+<ParamField body="ubicacion" type="string">
+  Location or address of the site
+</ParamField>
+
+<ParamField body="importancia" type="string">
+  Historical or cultural significance
+</ParamField>
+
+<ParamField body="coordenadas" type="object">
+  Geographic coordinates
+  
+  <ParamField body="coordenadas.latitud" type="number">
+    Latitude (-90 to 90)
+  </ParamField>
+  
+  <ParamField body="coordenadas.longitud" type="number">
+    Longitude (-180 to 180)
+  </ParamField>
+</ParamField>
+
+<ParamField body="anio_construccion" type="array">
+  Year(s) of construction (1 or 2 integer values)
+</ParamField>
+
+<ParamField body="arquitecto" type="string">
+  Name of the architect
+</ParamField>
+
+<ParamField body="area_construccion" type="number">
+  Construction area in square meters
+</ParamField>
+
+<ParamField body="funcion" type="string">
+  Function of the site
+</ParamField>
+
+### Response
+
+<ResponseField name="message" type="string">
+  Success message
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X PUT https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011 \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "importancia": "Principal templo católico del Perú, declarado Patrimonio Cultural",
+    "funcion": "Templo religioso, museo y sede arquidiocesana"
+  }'
+```
+
+```python Python
+import requests
+
+url = "https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011"
+headers = {
+    "Authorization": "Bearer YOUR_ADMIN_TOKEN",
+    "Content-Type": "application/json"
+}
+
+data = {
+    "importancia": "Principal templo católico del Perú, declarado Patrimonio Cultural",
+    "funcion": "Templo religioso, museo y sede arquidiocesana"
+}
+
+response = requests.put(url, json=data, headers=headers)
+print(response.json())
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011',
+  {
+    method: 'PUT',
+    headers: {
+      'Authorization': 'Bearer YOUR_ADMIN_TOKEN',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      importancia: 'Principal templo católico del Perú, declarado Patrimonio Cultural',
+      funcion: 'Templo religioso, museo y sede arquidiocesana'
+    })
+  }
+);
+
+const data = await response.json();
+console.log(data);
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "message": "Destino actualizado correctamente"
+}
+```
+
+```json Error Response
+{
+  "detail": "La latitud debe estar entre -90 y 90 grados."
+}
+```
+
+</ResponseExample>
+
+---
+
+## Toggle Destination Status
+
+**Endpoint:** `PUT /destinos/estado/{id}`
+
+Toggle the active status of a destination between active and inactive.
+
+<ParamField path="id" type="string" required>
+  MongoDB ObjectId of the destination
+</ParamField>
+
+### Authentication
+
+**Required Role:** Editor (or higher)
+
+### Response
+
+<ResponseField name="message" type="string">
+  Success message indicating the new status
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X PUT https://api.tesisrutas.com/destinos/estado/507f1f77bcf86cd799439011 \
+  -H "Authorization: Bearer YOUR_EDITOR_TOKEN"
+```
+
+```python Python
+import requests
+
+url = "https://api.tesisrutas.com/destinos/estado/507f1f77bcf86cd799439011"
+headers = {
+    "Authorization": "Bearer YOUR_EDITOR_TOKEN"
+}
+
+response = requests.put(url, headers=headers)
+print(response.json())
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://api.tesisrutas.com/destinos/estado/507f1f77bcf86cd799439011',
+  {
+    method: 'PUT',
+    headers: {
+      'Authorization': 'Bearer YOUR_EDITOR_TOKEN'
+    }
+  }
+);
+
+const data = await response.json();
+console.log(data);
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "message": "Destino desactivado correctamente"
+}
+```
+
+```json Alternate Response
+{
+  "message": "Destino activado correctamente"
+}
+```
+
+```json Error Response
+{
+  "detail": "Destino no encontrado"
+}
+```
+
+</ResponseExample>
+
+## Implementation Details
+
+### Update Data Endpoint
+
+This endpoint (`PUT /destinos/{id}`):
+1. Validates that the destination exists and is active
+2. Filters out null values from the update data
+3. Properly handles nested `coordenadas` object updates
+4. Uses MongoDB `$set` operator to update only provided fields
+5. Returns error if validation fails (invalid coordinates, year format, etc.)
+
+**Source:** `destinos_router.py:36-44`
+
+### Toggle Status Endpoint
+
+This endpoint (`PUT /destinos/estado/{id}`):
+1. Retrieves the current `activo` status
+2. Toggles it to the opposite value (true → false or false → true)
+3. Updates the document regardless of current active state
+4. Returns a descriptive message indicating the new status
+
+**Permissions:**
+- Editors can toggle status (useful for content moderation)
+- Admins can toggle status and fully update data
+
+**Source:** `destinos_router.py:46-54`

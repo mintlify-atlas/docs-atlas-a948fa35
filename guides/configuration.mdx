@@ -1,0 +1,297 @@
+---
+title: 'Configuration'
+description: 'Configure environment variables and external services'
+icon: 'gear'
+---
+
+This guide covers all configuration steps needed to run Tesis Rutas locally and in production.
+
+## Configuration Overview
+
+Tesis Rutas uses environment variables for configuration. The application can read configuration from:
+
+1. **Environment variables** (`.env` file or system variables) - Recommended for production
+2. **local_config.json** - Optional for local development
+
+<Note>
+  The configuration system is defined in `src/config/settings.py` and uses Pydantic Settings for validation.
+</Note>
+
+## Required Environment Variables
+
+### MongoDB Configuration
+
+Tesis Rutas uses MongoDB for data storage.
+
+<Steps>
+  <Step title="Get MongoDB connection string">
+    You can use:
+    - **MongoDB Atlas** (cloud) - Recommended
+    - **Local MongoDB instance**
+    
+    For MongoDB Atlas:
+    1. Create a free account at [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
+    2. Create a new cluster
+    3. Get your connection string (format: `mongodb+srv://username:password@cluster.mongodb.net/`)
+  </Step>
+
+  <Step title="Set MongoDB variables">
+    <CodeGroup>
+      ```bash .env file
+      MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/
+      MONGO_DB=turismo_digital_uce
+      ```
+      
+      ```json local_config.json (development)
+      {
+        "MONGO_URI": "mongodb+srv://username:password@cluster.mongodb.net/",
+        "MONGO_DB": "turismo_digital_uce"
+      }
+      ```
+    </CodeGroup>
+    
+    <Warning>
+      Never commit `local_config.json` or `.env` files to version control. These files contain sensitive credentials.
+    </Warning>
+  </Step>
+</Steps>
+
+### Cloudinary Configuration
+
+Cloudinary is used for image and media storage.
+
+<Steps>
+  <Step title="Create Cloudinary account">
+    1. Sign up at [cloudinary.com](https://cloudinary.com/)
+    2. Navigate to your Dashboard
+    3. Copy your Cloud Name, API Key, and API Secret
+  </Step>
+
+  <Step title="Set Cloudinary variables">
+    <CodeGroup>
+      ```bash .env file
+      CLOUDINARY_CLOUD_NAME=your_cloud_name
+      CLOUDINARY_API_KEY=your_api_key
+      CLOUDINARY_API_SECRET=your_api_secret
+      ```
+      
+      ```json local_config.json (development)
+      {
+        "CLOUDINARY_CLOUD_NAME": "your_cloud_name",
+        "CLOUDINARY_API_KEY": "your_api_key",
+        "CLOUDINARY_API_SECRET": "your_api_secret"
+      }
+      ```
+    </CodeGroup>
+    
+    These credentials are configured in `src/infrastructure/services/cloudinary_config.py`.
+  </Step>
+</Steps>
+
+### JWT Authentication
+
+JWT tokens are used for user authentication and authorization.
+
+<Steps>
+  <Step title="Generate JWT secret key">
+    Generate a secure random secret key:
+    ```bash
+    python -c "import secrets; print(secrets.token_urlsafe(32))"
+    ```
+  </Step>
+
+  <Step title="Set JWT variables">
+    <CodeGroup>
+      ```bash .env file
+      JWT_SECRET_KEY=your_generated_secret_key
+      JWT_ALGORITHM=HS256
+      JWT_EXPIRE_MINUTES=60
+      ```
+      
+      ```json local_config.json (development)
+      {
+        "JWT_SECRET_KEY": "your_generated_secret_key",
+        "JWT_ALGORITHM": "HS256",
+        "JWT_EXPIRE_MINUTES": 60
+      }
+      ```
+    </CodeGroup>
+    
+    <Warning>
+      Use a strong, randomly generated secret key. Never use the default or share it publicly.
+    </Warning>
+  </Step>
+</Steps>
+
+## Configuration File Locations
+
+<CodeGroup>
+  ```bash Backend .env
+  # Place in project root directory
+  tesis-rutas/
+  ├── .env              # ← Backend environment variables
+  ├── requirements.txt
+  ├── src/
+  └── frontend/
+  ```
+  
+  ```bash local_config.json
+  # Place in src/config/ directory
+  tesis-rutas/
+  ├── src/
+  │   ├── config/
+  │   │   ├── settings.py
+  │   │   └── local_config.json  # ← Local configuration (development only)
+  ```
+</CodeGroup>
+
+## Complete Configuration Example
+
+<CodeGroup>
+  ```bash .env (Production)
+  # MongoDB
+  MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/
+  MONGO_DB=turismo_digital_uce
+  
+  # Cloudinary
+  CLOUDINARY_CLOUD_NAME=your_cloud_name
+  CLOUDINARY_API_KEY=123456789012345
+  CLOUDINARY_API_SECRET=your_api_secret
+  
+  # JWT
+  JWT_SECRET_KEY=your_secure_random_key_here
+  JWT_ALGORITHM=HS256
+  JWT_EXPIRE_MINUTES=60
+  
+  # Application
+  DEBUG=false
+  ```
+  
+  ```json local_config.json (Development)
+  {
+    "MONGO_URI": "mongodb+srv://user:pass@cluster.mongodb.net/",
+    "MONGO_DB": "turismo_digital_uce",
+    "CLOUDINARY_CLOUD_NAME": "your_cloud_name",
+    "CLOUDINARY_API_KEY": "123456789012345",
+    "CLOUDINARY_API_SECRET": "your_api_secret",
+    "JWT_SECRET_KEY": "your_secure_random_key_here",
+    "JWT_ALGORITHM": "HS256",
+    "JWT_EXPIRE_MINUTES": 60
+  }
+  ```
+</CodeGroup>
+
+## Frontend Configuration
+
+The frontend needs to know where the backend API is running.
+
+<Steps>
+  <Step title="Development - Update API base URL">
+    In your frontend code (typically in `src/config/api.js` or similar), set:
+    ```javascript
+    const API_BASE_URL = 'http://localhost:8000';
+    ```
+  </Step>
+
+  <Step title="Production - Update CORS origins">
+    Update allowed origins in `src/infrastructure/api/main.py`:
+    ```python
+    origins = [
+        "http://localhost:5173",              # Local development
+        "https://your-frontend.vercel.app",   # Production frontend
+    ]
+    ```
+  </Step>
+</Steps>
+
+## Verify Configuration
+
+Test your configuration to ensure everything is set up correctly:
+
+<Steps>
+  <Step title="Test MongoDB connection">
+    ```bash
+    python -c "from src.infrastructure.database.mongo_config import get_database; db = get_database(); print('✅ MongoDB connected')"
+    ```
+    
+    You should see: `✅ Conectado a MongoDB (turismo_digital_uce) correctamente.`
+  </Step>
+
+  <Step title="Test Cloudinary connection">
+    ```bash
+    python -c "from src.infrastructure.services.cloudinary_config import cloudinary; print('✅ Cloudinary configured')"
+    ```
+  </Step>
+
+  <Step title="Run the application">
+    Start the backend server:
+    ```bash
+    uvicorn src.infrastructure.api.main:app --reload
+    ```
+    
+    Visit `http://localhost:8000` - you should see:
+    ```json
+    {"message": "API de Turismo Digital UCE funcionando correctamente 🚀"}
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="MongoDB connection timeout">
+    **Problem:** `ServerSelectionTimeoutError` when connecting to MongoDB
+    
+    **Solutions:**
+    - Verify your `MONGO_URI` is correct
+    - Check that your IP address is whitelisted in MongoDB Atlas (Network Access)
+    - Ensure your database user has proper permissions
+    - Check your internet connection
+  </Accordion>
+  
+  <Accordion title="Configuration not loading">
+    **Problem:** Application can't find configuration variables
+    
+    **Solutions:**
+    - For `.env` file: Place it in the project root directory
+    - For `local_config.json`: Place it in `src/config/` directory
+    - Verify file names are exact (case-sensitive)
+    - Check that environment variables are properly formatted
+  </Accordion>
+  
+  <Accordion title="Cloudinary upload fails">
+    **Problem:** Images fail to upload to Cloudinary
+    
+    **Solutions:**
+    - Verify all three Cloudinary credentials are set correctly
+    - Check that your API key and secret have no extra spaces
+    - Ensure your Cloudinary account is active
+  </Accordion>
+  
+  <Accordion title="JWT authentication not working">
+    **Problem:** Token validation fails
+    
+    **Solutions:**
+    - Ensure `JWT_SECRET_KEY` is set and consistent across restarts
+    - Verify `JWT_ALGORITHM` is set to `HS256`
+    - Check that tokens haven't expired (default: 60 minutes)
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Run locally" icon="play">
+    Start the development server:
+    ```bash
+    # Backend
+    uvicorn src.infrastructure.api.main:app --reload
+    
+    # Frontend (in another terminal)
+    cd frontend && npm run dev
+    ```
+  </Card>
+  <Card title="Deploy to production" icon="rocket" href="/guides/deployment">
+    Learn how to deploy your configured application
+  </Card>
+</CardGroup>

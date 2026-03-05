@@ -1,0 +1,385 @@
+---
+title: 'Destination Multimedia'
+api: 'POST /destinos/{id}/multimedia'
+description: 'Upload and manage multimedia files for heritage sites via Cloudinary'
+---
+
+## Upload Multimedia
+
+**Endpoint:** `POST /destinos/{id}/multimedia`
+
+Upload images or videos to a destination. Files are stored in Cloudinary with automatic optimization and metadata extraction.
+
+<ParamField path="id" type="string" required>
+  MongoDB ObjectId of the destination
+</ParamField>
+
+### Authentication
+
+**Required Role:** Admin
+
+### Request Body
+
+**Content-Type:** `multipart/form-data`
+
+<ParamField body="files" type="file[]" required>
+  Array of files to upload (1-3 files per request)
+  - Supports images (jpg, png, gif, etc.)
+  - Supports videos (mp4, mov, avi, etc.)
+  - Auto-detected by Cloudinary's `resource_type: "auto"`
+</ParamField>
+
+### Response
+
+<ResponseField name="message" type="string">
+  Success message
+</ResponseField>
+
+<ResponseField name="total_actual" type="number">
+  New total count of multimedia files for this destination
+</ResponseField>
+
+<ResponseField name="archivos" type="array">
+  Array of uploaded file metadata
+  
+  <ResponseField name="archivos[].destino_id" type="string">
+    ID of the destination
+  </ResponseField>
+  
+  <ResponseField name="archivos[].url" type="string">
+    Cloudinary secure URL
+  </ResponseField>
+  
+  <ResponseField name="archivos[].public_id" type="string">
+    Cloudinary public ID (used for deletion)
+  </ResponseField>
+  
+  <ResponseField name="archivos[].tipo" type="string">
+    Resource type: "image" or "video"
+  </ResponseField>
+  
+  <ResponseField name="archivos[].formato" type="string">
+    File format (e.g., "jpg", "mp4")
+  </ResponseField>
+  
+  <ResponseField name="archivos[].tamanio_bytes" type="number">
+    File size in bytes
+  </ResponseField>
+  
+  <ResponseField name="archivos[].anchura" type="number">
+    Width in pixels (for images/videos)
+  </ResponseField>
+  
+  <ResponseField name="archivos[].altura" type="number">
+    Height in pixels (for images/videos)
+  </ResponseField>
+  
+  <ResponseField name="archivos[].duracion" type="number">
+    Duration in seconds (videos only)
+  </ResponseField>
+  
+  <ResponseField name="archivos[].fecha_creacion" type="string">
+    ISO 8601 upload timestamp
+  </ResponseField>
+  
+  <ResponseField name="archivos[].activo" type="boolean">
+    Always true
+  </ResponseField>
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011/multimedia \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+  -F "files=@cathedral_front.jpg" \
+  -F "files=@cathedral_interior.jpg" \
+  -F "files=@cathedral_tour.mp4"
+```
+
+```python Python
+import requests
+
+url = "https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011/multimedia"
+headers = {
+    "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+}
+
+files = [
+    ('files', ('cathedral_front.jpg', open('cathedral_front.jpg', 'rb'), 'image/jpeg')),
+    ('files', ('cathedral_interior.jpg', open('cathedral_interior.jpg', 'rb'), 'image/jpeg')),
+    ('files', ('cathedral_tour.mp4', open('cathedral_tour.mp4', 'rb'), 'video/mp4'))
+]
+
+response = requests.post(url, headers=headers, files=files)
+print(response.json())
+```
+
+```javascript JavaScript
+const formData = new FormData();
+formData.append('files', cathedralFrontFile);
+formData.append('files', cathedralInteriorFile);
+formData.append('files', cathedralTourVideo);
+
+const response = await fetch(
+  'https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011/multimedia',
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_ADMIN_TOKEN'
+    },
+    body: formData
+  }
+);
+
+const data = await response.json();
+console.log(data);
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "message": "Multimedia agregada correctamente",
+  "total_actual": 3,
+  "archivos": [
+    {
+      "destino_id": "507f1f77bcf86cd799439011",
+      "url": "https://res.cloudinary.com/demo/image/upload/v1234567890/destinations/507f1f77bcf86cd799439011/abc123.jpg",
+      "public_id": "destinations/507f1f77bcf86cd799439011/abc123",
+      "tipo": "image",
+      "formato": "jpg",
+      "tamanio_bytes": 2456789,
+      "anchura": 1920,
+      "altura": 1080,
+      "duracion": null,
+      "fecha_creacion": "2024-03-05T10:30:00.000Z",
+      "activo": true
+    },
+    {
+      "destino_id": "507f1f77bcf86cd799439011",
+      "url": "https://res.cloudinary.com/demo/video/upload/v1234567891/destinations/507f1f77bcf86cd799439011/xyz789.mp4",
+      "public_id": "destinations/507f1f77bcf86cd799439011/xyz789",
+      "tipo": "video",
+      "formato": "mp4",
+      "tamanio_bytes": 15678912,
+      "anchura": 1920,
+      "altura": 1080,
+      "duracion": 45.3,
+      "fecha_creacion": "2024-03-05T10:30:05.000Z",
+      "activo": true
+    }
+  ]
+}
+```
+
+```json Error: Too Many Files
+{
+  "detail": "Debes subir entre 1 y 3 archivos por solicitud."
+}
+```
+
+```json Error: Limit Exceeded
+{
+  "detail": "El destino ya tiene el máximo permitido de 10 archivos multimedia."
+}
+```
+
+```json Error: Partial Limit
+{
+  "detail": "Solo puedes subir 2 archivos adicionales."
+}
+```
+
+```json Error: Rollback
+{
+  "detail": "Error al guardar multimedia, las subidas fueron revertidas. Detalle: Connection timeout"
+}
+```
+
+</ResponseExample>
+
+## Upload Constraints
+
+<Info>
+  **Per-Request Limit:** 1-3 files per request
+  
+  **Global Limit:** Maximum 10 files per destination
+  
+  The endpoint validates both constraints before uploading.
+</Info>
+
+### Examples:
+- Destination has 0 files → Can upload 1-3 files
+- Destination has 8 files → Can upload 1-2 files
+- Destination has 10 files → Cannot upload (returns 400 error)
+
+---
+
+## Delete Multimedia
+
+**Endpoint:** `DELETE /destinos/{id}/multimedia`
+
+Remove a specific multimedia file from a destination.
+
+<ParamField path="id" type="string" required>
+  MongoDB ObjectId of the destination
+</ParamField>
+
+<ParamField query="public_id" type="string" required>
+  Cloudinary public_id of the file to delete
+</ParamField>
+
+### Authentication
+
+**Required Role:** Admin
+
+### Response
+
+<ResponseField name="message" type="string">
+  Success message
+</ResponseField>
+
+<ResponseField name="public_id" type="string">
+  The deleted file's public_id
+</ResponseField>
+
+<ResponseField name="error_cloudinary" type="string">
+  Cloudinary error message (if deletion from cloud failed)
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X DELETE "https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011/multimedia?public_id=destinations/507f1f77bcf86cd799439011/abc123" \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+```
+
+```python Python
+import requests
+
+url = "https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011/multimedia"
+headers = {
+    "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+}
+params = {
+    "public_id": "destinations/507f1f77bcf86cd799439011/abc123"
+}
+
+response = requests.delete(url, headers=headers, params=params)
+print(response.json())
+```
+
+```javascript JavaScript
+const publicId = encodeURIComponent('destinations/507f1f77bcf86cd799439011/abc123');
+const response = await fetch(
+  `https://api.tesisrutas.com/destinos/507f1f77bcf86cd799439011/multimedia?public_id=${publicId}`,
+  {
+    method: 'DELETE',
+    headers: {
+      'Authorization': 'Bearer YOUR_ADMIN_TOKEN'
+    }
+  }
+);
+
+const data = await response.json();
+console.log(data);
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response
+{
+  "message": "Multimedia eliminada correctamente",
+  "public_id": "destinations/507f1f77bcf86cd799439011/abc123"
+}
+```
+
+```json Partial Success
+{
+  "message": "Archivo eliminado solo de la base de datos. Error al borrar de Cloudinary.",
+  "error_cloudinary": "Resource not found"
+}
+```
+
+```json Error: File Not Found
+{
+  "detail": "El archivo multimedia no existe en este destino."
+}
+```
+
+```json Error: No Multimedia
+{
+  "detail": "El destino no tiene archivos multimedia."
+}
+```
+
+</ResponseExample>
+
+## Implementation Details
+
+### Upload Process
+
+1. **Validation**
+   - Checks 1-3 files per request
+   - Verifies destination exists and is active
+   - Validates global 10-file limit
+   - Calculates remaining capacity
+
+2. **Cloudinary Upload**
+   - Uploads files asynchronously using `asyncio.gather()`
+   - Uses folder structure: `destinations/{destino_id}/`
+   - Auto-detects resource type (image/video)
+   - Extracts metadata (dimensions, format, size, duration)
+
+3. **Database Storage**
+   - Creates `Multimedia` entities
+   - Stores using `AgregarMultimediaDestinoUseCase`
+   - Uses MongoDB `$push` with `$each` operator
+   - Appends to `multimedia` array in destination document
+
+4. **Rollback on Failure**
+   - If database save fails, deletes uploaded files from Cloudinary
+   - Uses `cloudinary.uploader.destroy()` for each public_id
+   - Prevents orphaned files in cloud storage
+
+**Source:** `destinos_router.py:96-201`
+
+### Delete Process
+
+1. **Validation**
+   - Verifies destination exists
+   - Checks multimedia array is not empty
+   - Finds file by public_id
+
+2. **Database Removal**
+   - Uses `EliminarMultimediaDestinoUseCase`
+   - Removes via MongoDB `$pull` operator
+   - Updates the destination's `multimedia` array
+
+3. **Cloudinary Deletion**
+   - Calls `cloudinary.uploader.destroy(public_id, resource_type=tipo)`
+   - Uses correct resource_type ("image" or "video")
+   - Returns graceful error if cloud deletion fails
+
+**Note:** If Cloudinary deletion fails, the file is still removed from the database. This prevents broken references but may leave orphaned files in Cloudinary.
+
+**Source:** `destinos_router.py:205-254`
+
+## Cloudinary Configuration
+
+The multimedia endpoints integrate with Cloudinary using:
+- Configuration loaded from `src/infrastructure/services/cloudinary_config.py`
+- Folder structure: `destinations/{destino_id}/`
+- Automatic resource type detection
+- Secure HTTPS URLs
+- Async upload for performance
+
+**File Limits:**
+- Per request: 1-3 files
+- Per destination: 10 files maximum
+- No explicit file size limits (handled by Cloudinary)

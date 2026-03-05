@@ -1,0 +1,147 @@
+---
+title: 'List Users'
+api: 'GET /usuarios/listar'
+description: 'Retrieve a complete list of all registered users in the system (admin only)'
+---
+
+## Authentication
+
+This endpoint requires admin authentication. Include a valid JWT token with admin role in the Authorization header.
+
+```bash
+Authorization: Bearer <admin_jwt_token>
+```
+
+## Response
+
+<ResponseField name="users" type="array">
+  Array of user objects
+  
+  <Expandable title="User Object">
+    <ResponseField name="id" type="string">
+      Unique user identifier (MongoDB ObjectId)
+    </ResponseField>
+    
+    <ResponseField name="nombre" type="string">
+      User's full name
+    </ResponseField>
+    
+    <ResponseField name="email" type="string">
+      User's email address
+    </ResponseField>
+    
+    <ResponseField name="rol" type="string">
+      User role: `admin`, `editor`, or `visitante`
+    </ResponseField>
+    
+    <ResponseField name="favoritos" type="array">
+      Array of favorite POI IDs
+    </ResponseField>
+    
+    <ResponseField name="pois_visitados" type="array">
+      Array of visited POI IDs
+    </ResponseField>
+    
+    <ResponseField name="rutas_recorridas" type="array">
+      Array of completed route objects
+    </ResponseField>
+    
+    <ResponseField name="fecha_creacion" type="datetime">
+      Account creation timestamp
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseExample>
+```json Response
+[
+  {
+    "id": "507f1f77bcf86cd799439011",
+    "nombre": "Juan Pérez",
+    "email": "juan@example.com",
+    "rol": "visitante",
+    "favoritos": ["507f191e810c19729de860ea", "507f191e810c19729de860eb"],
+    "pois_visitados": ["507f191e810c19729de860ea"],
+    "rutas_recorridas": [
+      {
+        "ruta_id": "507f191e810c19729de860ec",
+        "fecha": "2024-03-15T10:30:00Z"
+      }
+    ],
+    "fecha_creacion": "2024-01-10T08:00:00Z"
+  },
+  {
+    "id": "507f1f77bcf86cd799439012",
+    "nombre": "María González",
+    "email": "maria@example.com",
+    "rol": "editor",
+    "favoritos": [],
+    "pois_visitados": [],
+    "rutas_recorridas": [],
+    "fecha_creacion": "2024-02-20T14:15:00Z"
+  }
+]
+```
+</ResponseExample>
+
+## Code Examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET "https://api.tesisrutas.com/usuarios/listar" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+```python Python
+import requests
+
+url = "https://api.tesisrutas.com/usuarios/listar"
+headers = {
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+
+response = requests.get(url, headers=headers)
+users = response.json()
+
+for user in users:
+    print(f"{user['nombre']} - {user['email']} ({user['rol']})")
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.tesisrutas.com/usuarios/listar', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+  }
+});
+
+const users = await response.json();
+console.log(`Total users: ${users.length}`);
+```
+</CodeGroup>
+
+## Error Responses
+
+<ResponseField name="403" type="error">
+  Forbidden - User does not have admin privileges
+  ```json
+  {
+    "detail": "No tienes permisos de administrador"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="401" type="error">
+  Unauthorized - Missing or invalid JWT token
+  ```json
+  {
+    "detail": "Not authenticated"
+  }
+  ```
+</ResponseField>
+
+## Implementation Details
+
+Source: `src/infrastructure/api/routers/usuario_router.py:83-87`
+
+This endpoint uses the `ListarUsuarios` use case to fetch all users from the MongoDB `usuarios` collection. The response includes complete user profiles with activity tracking data.

@@ -1,0 +1,89 @@
+---
+title: "Delete Route"
+api: "DELETE /rutas/{id}"
+description: "Permanently delete a tourist route from the system"
+---
+
+Removes a tourist route from the database. This operation is permanent and cannot be undone.
+
+## Authentication
+
+Requires **Editor** role or higher.
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the route to delete
+</ParamField>
+
+<ResponseField name="mensaje" type="string">
+  Confirmation message indicating successful deletion
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X DELETE https://api.tesisrutas.com/rutas/507f1f77bcf86cd799439020 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+import requests
+
+ruta_id = "507f1f77bcf86cd799439020"
+url = f"https://api.tesisrutas.com/rutas/{ruta_id}"
+
+headers = {
+    "Authorization": "Bearer YOUR_TOKEN"
+}
+
+response = requests.delete(url, headers=headers)
+print(response.json())
+```
+
+```javascript JavaScript
+const rutaId = '507f1f77bcf86cd799439020';
+const response = await fetch(`https://api.tesisrutas.com/rutas/${rutaId}`, {
+  method: 'DELETE',
+  headers: {
+    'Authorization': 'Bearer YOUR_TOKEN'
+  }
+});
+
+const data = await response.json();
+console.log(data);
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "mensaje": "Ruta eliminada correctamente"
+}
+```
+
+```json 404 Not Found
+{
+  "detail": "Ruta no encontrada o no eliminada"
+}
+```
+
+</ResponseExample>
+
+## Important Notes
+
+<Warning>
+  This operation permanently deletes the route. There is no undo functionality.
+</Warning>
+
+- Deletion is permanent and immediate
+- Referenced POIs are NOT deleted (only the route itself)
+- No soft-delete mechanism is in place
+- Consider archiving important routes instead of deleting
+
+## Error Responses
+
+- **404 Not Found**: Route does not exist or deletion failed
+- **401 Unauthorized**: Missing or invalid authentication token
+- **403 Forbidden**: User does not have Editor role
+- **422 Unprocessable Entity**: Invalid route ID format

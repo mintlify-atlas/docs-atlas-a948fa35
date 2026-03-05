@@ -1,0 +1,299 @@
+---
+title: 'Tourist Routes'
+description: 'Create and manage tourist routes with ordered POIs and interactive Leaflet maps'
+icon: 'route'
+---
+
+## Overview
+
+Tourist routes (`RutaTuristica`) connect multiple destinations into ordered itineraries. Routes feature automatic distance-based ordering, interactive maps, and flexible management capabilities.
+
+<Note>
+  Routes require a minimum of **2 POIs** and automatically order them by geographic proximity for optimal travel planning.
+</Note>
+
+## Data Model
+
+The `RutaTuristica` entity is defined in `src/domain/entities/ruta_turistica.py`:
+
+```python Route Entity
+from dataclasses import dataclass, field
+from typing import List, Optional
+from datetime import datetime
+from src.domain.entities.ruta_poi import RutaPOI
+
+@dataclass
+class RutaTuristica:
+    nombre: str                        # Route name (admin-assigned)
+    descripcion: Optional[str]         # Optional description
+    categoria: str                     # Route category
+    puntos: List[RutaPOI] = field(default_factory=list)   # Ordered POIs
+    creado_en: datetime = field(default_factory=datetime.utcnow)
+```
+
+### RutaPOI Structure
+
+Each point in a route is represented by `RutaPOI` (src/domain/entities/ruta_poi.py):
+
+```python POI Reference
+@dataclass
+class RutaPOI:
+    poi_id: str  # ID of the destination
+    order: int   # Position within the route (0-indexed)
+```
+
+## API Endpoints
+
+All route endpoints are defined in `src/infrastructure/api/routers/rutas_router.py`:
+
+<Steps>
+  <Step title="Create Route">
+    **POST** `/rutas/crear`
+    
+    Requires: Editor role
+    
+    Automatically orders POIs by proximity using the `CrearRutaTuristicaUseCase`.
+    
+    ```json Request Body
+    {
+      "nombre": "Ruta Colonial Lima Centro",
+      "descripcion": "Tour por sitios coloniales del centro histórico",
+      "categoria": "Histórica",
+      "pois": [
+        {"poi_id": "507f1f77bcf86cd799439011"},
+        {"poi_id": "507f1f77bcf86cd799439012"},
+        {"poi_id": "507f1f77bcf86cd799439013"}
+      ]
+    }
+    ```
+    
+    **Response:**
+    ```json
+    {
+      "ruta_id": "507f1f77bcf86cd799439020"
+    }
+    ```
+    
+    <Accordion title="Validation Rules">
+      - Minimum 2 POIs required
+      - All POI IDs must exist in the database
+      - First POI becomes the starting point
+      - Remaining POIs are automatically ordered by distance
+    </Accordion>
+  </Step>
+  
+  <Step title="Get Route by ID">
+    **GET** `/rutas/{ruta_id}`
+    
+    Public endpoint - retrieves complete route details including all POI information.
+  </Step>
+  
+  <Step title="List All Routes">
+    **GET** `/rutas/`
+    
+    Public endpoint - returns all tourist routes in the system.
+  </Step>
+  
+  <Step title="Update Route">
+    **PUT** `/rutas/{ruta_id}`
+    
+    Requires: Editor role
+    
+    Updates route metadata and POI ordering.
+    
+    ```json Request Body
+    {
+      "nombre": "Updated Route Name",
+      "descripcion": "New description",
+      "categoria": "Cultural",
+      "pois": [
+        {"poi_id": "507f1f77bcf86cd799439011", "order": 0},
+        {"poi_id": "507f1f77bcf86cd799439012", "order": 1}
+      ]
+    }
+    ```
+  </Step>
+  
+  <Step title="Delete Route">
+    **DELETE** `/rutas/{ruta_id}`
+    
+    Requires: Editor role
+    
+    Permanently removes the route from the database.
+  </Step>
+</Steps>
+
+## Creating Routes
+
+The `CrearRutaTuristicaUseCase` (src/application/use_cases/Rutas/crear_ruta_turistica.py) implements intelligent route creation:
+
+```python Route Creation Logic
+class CrearRutaTuristicaUseCase:
+    def execute(
+        self,
+        nombre: str,
+        descripcion: str,
+        categoria: str,
+        punto_inicio_id: str,
+        poi_ids: List[str]
+    ) -> str:
+        
+        # Validation
+        if len(poi_ids) < 2:
+            raise ValueError("Una ruta debe tener al menos 2 POIs.")
+
+        if punto_inicio_id not in poi_ids:
+            poi_ids = [punto_inicio_id] + poi_ids
+
+        # Fetch POIs from database
+        pois = [self.destino_repo.obtener_por_id(pid) for pid in poi_ids]
+        if any(p is None for p in pois):
+            raise ValueError("Uno o más POIs no existen.")
+
+        # Order POIs by proximity
+        ordenados = self._ordenar_por_distancia(punto_inicio_id, pois)
+
+        # Create RutaPOI objects
+        ruta_pois = []
+        for idx, poi in enumerate(ordenados):
+            ruta_pois.append(
+                RutaPOI(
+                    poi_id=poi["_id"],
+                    order=idx
+                )
+            )
+
+        # Create and save route
+        ruta = RutaTuristica(
+            nombre=nombre,
+            descripcion=descripcion,
+            categoria=categoria,
+            puntos=ruta_pois
+        )
+
+        return self.ruta_repo.crear(ruta)
+```
+
+### Distance-Based Ordering
+
+The `_ordenar_por_distancia` method implements a greedy nearest-neighbor algorithm:
+
+```python Proximity Ordering Algorithm
+def _ordenar_por_distancia(self, inicio_id, pois_docs):
+    """Ordena los POIs automáticamente según cercanía geográfica."""
+
+    # Find starting POI
+    inicio = next(p for p in pois_docs if p["_id"] == inicio_id)
+    restantes = [p for p in pois_docs if p["_id"] != inicio_id]
+    orden = [inicio]
+
+    actual = inicio
+    while restantes:
+        # Calculate distances using Haversine formula
+        siguientes = sorted(
+            restantes,
+            key=lambda p: calcular_distancia(
+                actual["coordenadas"]["latitud"],
+                actual["coordenadas"]["longitud"],
+                p["coordenadas"]["latitud"],
+                p["coordenadas"]["longitud"]
+            )
+        )
+
+        siguiente = siguientes[0]
+        orden.append(siguiente)
+        restantes.remove(siguiente)
+        actual = siguiente
+
+    return orden
+```
+
+## Distance Calculation
+
+The Haversine formula (src/application/services/validacion_rutas_service.py) calculates great-circle distances:
+
+```python Haversine Implementation
+import math
+
+def calcular_distancia(lat1, lng1, lat2, lng2):
+    R = 6371  # Earth radius in km
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * \
+        math.cos(math.radians(lat2)) * math.sin(dlng/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    return R * c  # Distance in kilometers
+```
+
+## Interactive Maps
+
+Routes are displayed on Leaflet-powered interactive maps with:
+
+- **Markers**: Each POI is marked with coordinates
+- **Polylines**: Visual route path connecting POIs in order
+- **Popups**: POI details on marker click
+- **Zoom Controls**: Navigate and explore route details
+
+<Note>
+  The frontend integration uses Leaflet.js to render routes from the API data, displaying ordered POIs with connecting paths.
+</Note>
+
+## POI Suggestions
+
+While creating routes, the system can suggest nearby POIs:
+
+**POST** `/rutas/sugerencias`
+
+Requires: Current POI ID and list of already selected POIs
+
+```json Request
+{
+  "actual": "507f1f77bcf86cd799439011",
+  "seleccionados": ["507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012"]
+}
+```
+
+```json Response
+{
+  "actual": "507f1f77bcf86cd799439011",
+  "seleccionados": [...],
+  "sugerencias": [
+    {
+      "id": "507f1f77bcf86cd799439013",
+      "nombre": "Palacio de Gobierno",
+      "ubicacion": "Plaza Mayor",
+      "distancia_km": 0.15,
+      "coordenadas": {...},
+      "multimedia": [...]
+    }
+  ]
+}
+```
+
+See [Route Generation](/features/route-generation) for AI-powered automatic route creation.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Minimum POIs" icon="location-dot">
+    Always include at least 2 POIs - the system enforces this at the use case level
+  </Card>
+  
+  <Card title="Starting Point" icon="flag">
+    Choose the most accessible or iconic site as the starting point for better user experience
+  </Card>
+  
+  <Card title="Route Categories" icon="tags">
+    Use consistent category naming (e.g., "Histórica", "Cultural", "Religiosa") for better organization
+  </Card>
+  
+  <Card title="Descriptions" icon="file-text">
+    Provide clear descriptions highlighting what makes the route unique or noteworthy
+  </Card>
+</CardGroup>
+
+## Related Features
+
+- [Route Generation](/features/route-generation) - AI-powered automatic route creation
+- [Destinations](/features/destinations) - Manage POIs included in routes
+- [Multimedia](/features/multimedia) - View destination media within routes

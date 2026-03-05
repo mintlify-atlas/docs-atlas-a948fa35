@@ -1,0 +1,556 @@
+---
+title: 'Deployment'
+description: 'Deploy Tesis Rutas to production'
+icon: 'rocket'
+---
+
+This guide covers deploying the Tesis Rutas platform to production, including both the FastAPI backend and React frontend.
+
+## Deployment Architecture
+
+Tesis Rutas consists of two separate applications:
+
+<CardGroup cols={2}>
+  <Card title="Backend" icon="server">
+    FastAPI application that needs a Python-compatible hosting service
+  </Card>
+  <Card title="Frontend" icon="browser">
+    React + Vite application that can be deployed to static hosting
+  </Card>
+</CardGroup>
+
+## Prerequisites
+
+Before deploying, ensure you have:
+
+<Steps>
+  <Step title="Configuration ready">
+    All environment variables configured (see [Configuration guide](/guides/configuration))
+  </Step>
+  
+  <Step title="External services active">
+    - MongoDB Atlas cluster running
+    - Cloudinary account configured
+    - JWT secret key generated
+  </Step>
+  
+  <Step title="Code tested locally">
+    Application runs successfully in development
+  </Step>
+</Steps>
+
+## Backend Deployment
+
+The FastAPI backend can be deployed to various platforms that support Python applications.
+
+### Deployment Options
+
+<Tabs>
+  <Tab title="Railway">
+    Railway provides easy deployment for Python applications.
+    
+    <Steps>
+      <Step title="Install Railway CLI">
+        ```bash
+        npm install -g @railway/cli
+        ```
+      </Step>
+      
+      <Step title="Login to Railway">
+        ```bash
+        railway login
+        ```
+      </Step>
+      
+      <Step title="Initialize project">
+        From your project root:
+        ```bash
+        railway init
+        ```
+      </Step>
+      
+      <Step title="Add environment variables">
+        In the Railway dashboard, add all required environment variables:
+        - `MONGO_URI`
+        - `MONGO_DB`
+        - `CLOUDINARY_CLOUD_NAME`
+        - `CLOUDINARY_API_KEY`
+        - `CLOUDINARY_API_SECRET`
+        - `JWT_SECRET_KEY`
+        - `JWT_ALGORITHM`
+        - `JWT_EXPIRE_MINUTES`
+      </Step>
+      
+      <Step title="Deploy">
+        ```bash
+        railway up
+        ```
+        
+        Railway will automatically detect your Python application and deploy it.
+      </Step>
+    </Steps>
+    
+    <Note>
+      Railway provides a free tier with 500 hours/month, perfect for small projects.
+    </Note>
+  </Tab>
+  
+  <Tab title="Render">
+    Render offers free hosting for web services.
+    
+    <Steps>
+      <Step title="Create Render account">
+        Sign up at [render.com](https://render.com/)
+      </Step>
+      
+      <Step title="Create new Web Service">
+        1. Click "New +" → "Web Service"
+        2. Connect your Git repository
+        3. Configure the service:
+           - **Name:** tesis-rutas-backend
+           - **Environment:** Python 3
+           - **Build Command:** `pip install -r requirements.txt`
+           - **Start Command:** `uvicorn src.infrastructure.api.main:app --host 0.0.0.0 --port $PORT`
+      </Step>
+      
+      <Step title="Add environment variables">
+        In the "Environment" section, add:
+        ```bash
+        MONGO_URI=your_mongodb_uri
+        MONGO_DB=turismo_digital_uce
+        CLOUDINARY_CLOUD_NAME=your_cloud_name
+        CLOUDINARY_API_KEY=your_api_key
+        CLOUDINARY_API_SECRET=your_api_secret
+        JWT_SECRET_KEY=your_secret_key
+        JWT_ALGORITHM=HS256
+        JWT_EXPIRE_MINUTES=60
+        ```
+      </Step>
+      
+      <Step title="Deploy">
+        Click "Create Web Service" - Render will build and deploy automatically.
+      </Step>
+    </Steps>
+  </Tab>
+  
+  <Tab title="Heroku">
+    Heroku is a popular platform for deploying Python applications.
+    
+    <Steps>
+      <Step title="Install Heroku CLI">
+        Download from [heroku.com/cli](https://devcenter.heroku.com/articles/heroku-cli)
+      </Step>
+      
+      <Step title="Login to Heroku">
+        ```bash
+        heroku login
+        ```
+      </Step>
+      
+      <Step title="Create Heroku app">
+        ```bash
+        heroku create tesis-rutas-backend
+        ```
+      </Step>
+      
+      <Step title="Create Procfile">
+        Create a file named `Procfile` in your project root:
+        ```
+        web: uvicorn src.infrastructure.api.main:app --host 0.0.0.0 --port $PORT
+        ```
+      </Step>
+      
+      <Step title="Set environment variables">
+        ```bash
+        heroku config:set MONGO_URI=your_mongodb_uri
+        heroku config:set MONGO_DB=turismo_digital_uce
+        heroku config:set CLOUDINARY_CLOUD_NAME=your_cloud_name
+        heroku config:set CLOUDINARY_API_KEY=your_api_key
+        heroku config:set CLOUDINARY_API_SECRET=your_api_secret
+        heroku config:set JWT_SECRET_KEY=your_secret_key
+        heroku config:set JWT_ALGORITHM=HS256
+        heroku config:set JWT_EXPIRE_MINUTES=60
+        ```
+      </Step>
+      
+      <Step title="Deploy to Heroku">
+        ```bash
+        git push heroku main
+        ```
+      </Step>
+    </Steps>
+    
+    <Warning>
+      Heroku no longer offers a free tier. Consider Railway or Render for free hosting.
+    </Warning>
+  </Tab>
+  
+  <Tab title="Docker">
+    Deploy using Docker for any cloud provider.
+    
+    <Steps>
+      <Step title="Create Dockerfile">
+        Create a `Dockerfile` in your project root:
+        ```dockerfile
+        FROM python:3.11-slim
+        
+        WORKDIR /app
+        
+        # Copy requirements and install dependencies
+        COPY requirements.txt .
+        RUN pip install --no-cache-dir -r requirements.txt
+        
+        # Copy application code
+        COPY . .
+        
+        # Expose port
+        EXPOSE 8000
+        
+        # Run the application
+        CMD ["uvicorn", "src.infrastructure.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+        ```
+      </Step>
+      
+      <Step title="Build Docker image">
+        ```bash
+        docker build -t tesis-rutas-backend .
+        ```
+      </Step>
+      
+      <Step title="Run container locally (test)">
+        ```bash
+        docker run -p 8000:8000 \
+          -e MONGO_URI=your_mongodb_uri \
+          -e MONGO_DB=turismo_digital_uce \
+          -e CLOUDINARY_CLOUD_NAME=your_cloud_name \
+          -e CLOUDINARY_API_KEY=your_api_key \
+          -e CLOUDINARY_API_SECRET=your_api_secret \
+          -e JWT_SECRET_KEY=your_secret_key \
+          tesis-rutas-backend
+        ```
+      </Step>
+      
+      <Step title="Deploy to cloud">
+        Push to any Docker-compatible cloud service:
+        - Google Cloud Run
+        - AWS ECS/Fargate
+        - Azure Container Instances
+        - DigitalOcean App Platform
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+### Verify Backend Deployment
+
+After deployment, test your backend:
+
+```bash
+curl https://your-backend-url.com/
+```
+
+You should receive:
+```json
+{"message": "API de Turismo Digital UCE funcionando correctamente 🚀"}
+```
+
+## Frontend Deployment
+
+The React frontend is a static site that can be deployed to various hosting platforms.
+
+### Update API Base URL
+
+Before building, update the API endpoint in your frontend configuration to point to your deployed backend:
+
+```javascript
+// frontend/src/config/api.js (or similar)
+const API_BASE_URL = 'https://your-backend-url.com';
+```
+
+### Deployment Options
+
+<Tabs>
+  <Tab title="Vercel (Recommended)">
+    Vercel is optimized for React and Vite applications.
+    
+    <Steps>
+      <Step title="Install Vercel CLI">
+        ```bash
+        npm install -g vercel
+        ```
+      </Step>
+      
+      <Step title="Navigate to frontend directory">
+        ```bash
+        cd frontend
+        ```
+      </Step>
+      
+      <Step title="Deploy to Vercel">
+        ```bash
+        vercel
+        ```
+        
+        Follow the prompts:
+        - Set up and deploy? **Yes**
+        - Which scope? Select your account
+        - Link to existing project? **No**
+        - Project name: **tesis-rutas**
+        - Directory: **./frontend**
+        - Override build settings? **No**
+      </Step>
+      
+      <Step title="Production deployment">
+        For production:
+        ```bash
+        vercel --prod
+        ```
+      </Step>
+    </Steps>
+    
+    <Note>
+      Vercel automatically detects Vite projects and configures the build settings. The default domain will be `https://tesis-rutas.vercel.app`.
+    </Note>
+  </Tab>
+  
+  <Tab title="Netlify">
+    Netlify provides easy deployment for static sites.
+    
+    <Steps>
+      <Step title="Build the frontend">
+        ```bash
+        cd frontend
+        npm run build
+        ```
+        
+        This creates a `dist` directory with the production build.
+      </Step>
+      
+      <Step title="Install Netlify CLI">
+        ```bash
+        npm install -g netlify-cli
+        ```
+      </Step>
+      
+      <Step title="Deploy to Netlify">
+        ```bash
+        netlify deploy
+        ```
+        
+        When prompted:
+        - Create new site? **Yes**
+        - Publish directory: **dist**
+      </Step>
+      
+      <Step title="Production deployment">
+        ```bash
+        netlify deploy --prod
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+  
+  <Tab title="GitHub Pages">
+    Deploy to GitHub Pages for free static hosting.
+    
+    <Steps>
+      <Step title="Install gh-pages">
+        ```bash
+        cd frontend
+        npm install --save-dev gh-pages
+        ```
+      </Step>
+      
+      <Step title="Update package.json">
+        Add these scripts to `frontend/package.json`:
+        ```json
+        {
+          "scripts": {
+            "predeploy": "npm run build",
+            "deploy": "gh-pages -d dist"
+          },
+          "homepage": "https://your-username.github.io/tesis-rutas"
+        }
+        ```
+      </Step>
+      
+      <Step title="Deploy">
+        ```bash
+        npm run deploy
+        ```
+      </Step>
+    </Steps>
+    
+    <Note>
+      Your site will be available at `https://your-username.github.io/tesis-rutas`
+    </Note>
+  </Tab>
+</Tabs>
+
+## Post-Deployment Configuration
+
+After deploying both frontend and backend:
+
+<Steps>
+  <Step title="Update CORS settings">
+    Update the allowed origins in `src/infrastructure/api/main.py`:
+    ```python
+    origins = [
+        "http://localhost:5173",                    # Local dev
+        "https://tesis-rutas.vercel.app",          # Production frontend
+        "https://www.your-custom-domain.com",      # Custom domain (if any)
+    ]
+    ```
+    
+    Redeploy the backend after making this change.
+  </Step>
+  
+  <Step title="Test the full application">
+    1. Visit your frontend URL
+    2. Test user authentication
+    3. Test route creation and destination management
+    4. Verify image uploads work correctly
+  </Step>
+  
+  <Step title="Set up custom domain (optional)">
+    Configure custom domains:
+    - **Frontend:** Follow your hosting provider's custom domain guide
+    - **Backend:** Most platforms provide custom domain settings in their dashboard
+  </Step>
+</Steps>
+
+## Environment-Specific Settings
+
+<CodeGroup>
+  ```python Production settings
+  # src/config/settings.py
+  class Settings(BaseSettings):
+      app_name: str = "FARM Turismo API"
+      debug: bool = False  # ← Disable debug in production
+      # ... other settings
+  ```
+  
+  ```python Development settings
+  # src/config/settings.py
+  class Settings(BaseSettings):
+      app_name: str = "FARM Turismo API"
+      debug: bool = True  # ← Enable debug for development
+      # ... other settings
+  ```
+</CodeGroup>
+
+<Warning>
+  Always set `debug: bool = False` in production to prevent exposing sensitive error information.
+</Warning>
+
+## Monitoring and Maintenance
+
+### Health Checks
+
+Monitor your deployment health:
+
+```bash
+# Backend health check
+curl https://your-backend-url.com/
+
+# Frontend availability
+curl https://your-frontend-url.com/
+```
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="CORS errors in production">
+    **Problem:** Frontend can't connect to backend due to CORS policy
+    
+    **Solution:**
+    - Verify your frontend URL is added to the `origins` list in `src/infrastructure/api/main.py`
+    - Ensure you redeploy the backend after updating CORS settings
+    - Check that the frontend is using HTTPS (not HTTP) if the backend uses HTTPS
+  </Accordion>
+  
+  <Accordion title="Environment variables not loading">
+    **Problem:** Application can't find configuration in production
+    
+    **Solution:**
+    - Verify all environment variables are set in your hosting platform's dashboard
+    - Check for typos in variable names (they are case-sensitive)
+    - Restart your application after adding environment variables
+  </Accordion>
+  
+  <Accordion title="Database connection fails">
+    **Problem:** Can't connect to MongoDB Atlas from production
+    
+    **Solution:**
+    - Whitelist your hosting provider's IP addresses in MongoDB Atlas
+    - Or allow access from anywhere (0.0.0.0/0) for testing
+    - Verify the MongoDB URI is correct and includes credentials
+  </Accordion>
+  
+  <Accordion title="Build fails on deployment">
+    **Problem:** Frontend or backend build fails during deployment
+    
+    **Solution:**
+    - Check build logs for specific errors
+    - Ensure all dependencies are listed in `requirements.txt` or `package.json`
+    - Verify Python/Node.js versions match your local environment
+  </Accordion>
+</AccordionGroup>
+
+## Scaling Considerations
+
+As your application grows:
+
+<CardGroup cols={2}>
+  <Card title="Database indexing" icon="database">
+    Add indexes to MongoDB collections for better query performance
+  </Card>
+  <Card title="CDN for media" icon="image">
+    Cloudinary automatically provides CDN for images
+  </Card>
+  <Card title="Caching" icon="bolt">
+    Implement Redis for session/data caching
+  </Card>
+  <Card title="Load balancing" icon="scale-balanced">
+    Use multiple backend instances with a load balancer
+  </Card>
+</CardGroup>
+
+## Rollback Strategy
+
+If a deployment fails:
+
+<Steps>
+  <Step title="Identify the issue">
+    Check logs in your hosting platform's dashboard
+  </Step>
+  
+  <Step title="Revert to previous version">
+    Most platforms support instant rollback to previous deployments
+  </Step>
+  
+  <Step title="Fix locally">
+    Reproduce and fix the issue in your local environment
+  </Step>
+  
+  <Step title="Redeploy">
+    Deploy the fixed version
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Monitor logs" icon="chart-line">
+    Set up logging and monitoring for your production application
+  </Card>
+  <Card title="Backup strategy" icon="cloud-arrow-up">
+    Implement regular MongoDB backups using Atlas automated backups
+  </Card>
+  <Card title="CI/CD" icon="gear">
+    Set up automated deployments with GitHub Actions or similar
+  </Card>
+  <Card title="Performance testing" icon="gauge">
+    Use tools like Lighthouse to test frontend performance
+  </Card>
+</CardGroup>

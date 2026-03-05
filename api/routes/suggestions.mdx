@@ -1,0 +1,314 @@
+---
+title: "Get POI Suggestions"
+api: "POST /rutas/sugerencias"
+description: "Get intelligent POI suggestions for building routes dynamically"
+---
+
+Provides smart POI suggestions based on the current location and already selected POIs. This endpoint is designed for interactive route building interfaces where users add POIs one by one.
+
+## Authentication
+
+No authentication required. This is a public endpoint.
+
+<ParamField body="actual" type="string" required>
+  ID of the current POI (last selected or current position)
+</ParamField>
+
+<ParamField body="seleccionados" type="array" required>
+  Array of POI IDs already selected in the route. Can be empty array for first suggestion.
+</ParamField>
+
+<ParamField body="limite" type="integer" default="5">
+  Maximum number of suggestions to return (default: 5)
+</ParamField>
+
+## Suggestion Algorithm
+
+The suggestion system uses intelligent filtering and proximity ranking:
+
+1. **Current Position**: Fetches coordinates of the current POI
+2. **Filter Selected**: Excludes all POIs already in `seleccionados` array
+3. **Calculate Distances**: Uses Haversine formula for all candidates
+4. **Sort by Proximity**: Orders by distance from current position
+5. **Return Top N**: Returns the closest unvisited POIs
+
+See `sugerir_pois_proximos.py:11-54` for implementation.
+
+<ResponseField name="actual" type="string">
+  Echo of the current POI ID from request
+</ResponseField>
+
+<ResponseField name="seleccionados" type="array">
+  Echo of the selected POI IDs from request
+</ResponseField>
+
+<ResponseField name="sugerencias" type="array">
+  Array of suggested POI objects, ordered by proximity
+  
+  <ResponseField name="id" type="string">
+    POI identifier
+  </ResponseField>
+  
+  <ResponseField name="nombre" type="string">
+    Name of the POI
+  </ResponseField>
+  
+  <ResponseField name="ubicacion" type="string">
+    Location description
+  </ResponseField>
+  
+  <ResponseField name="importancia" type="string">
+    Historical or cultural importance level
+  </ResponseField>
+  
+  <ResponseField name="anio_construccion" type="integer">
+    Year of construction
+  </ResponseField>
+  
+  <ResponseField name="funcion" type="string">
+    Original or current function of the site
+  </ResponseField>
+  
+  <ResponseField name="coordenadas" type="object">
+    Geographic coordinates
+    
+    <ResponseField name="latitud" type="number">
+      Latitude
+    </ResponseField>
+    
+    <ResponseField name="longitud" type="number">
+      Longitude
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="multimedia" type="array">
+    Array of media URLs (images, videos)
+  </ResponseField>
+  
+  <ResponseField name="distancia_km" type="number">
+    Distance in kilometers from the current POI
+  </ResponseField>
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://api.tesisrutas.com/rutas/sugerencias \
+  -H "Content-Type: application/json" \
+  -d '{
+    "actual": "507f1f77bcf86cd799439011",
+    "seleccionados": [
+      "507f1f77bcf86cd799439011",
+      "507f1f77bcf86cd799439012"
+    ],
+    "limite": 5
+  }'
+```
+
+```python Python
+import requests
+
+url = "https://api.tesisrutas.com/rutas/sugerencias"
+data = {
+    "actual": "507f1f77bcf86cd799439011",
+    "seleccionados": [
+        "507f1f77bcf86cd799439011",
+        "507f1f77bcf86cd799439012"
+    ],
+    "limite": 5
+}
+
+response = requests.post(url, json=data)
+result = response.json()
+
+print("Sugerencias de POIs cercanos:")
+for sugerencia in result['sugerencias']:
+    print(f"  - {sugerencia['nombre']} ({sugerencia['distancia_km']:.2f} km)")
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.tesisrutas.com/rutas/sugerencias', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    actual: '507f1f77bcf86cd799439011',
+    seleccionados: [
+      '507f1f77bcf86cd799439011',
+      '507f1f77bcf86cd799439012'
+    ],
+    limite: 5
+  })
+});
+
+const result = await response.json();
+console.log('Sugerencias de POIs cercanos:');
+result.sugerencias.forEach(sugerencia => {
+  console.log(`  - ${sugerencia.nombre} (${sugerencia.distancia_km.toFixed(2)} km)`);
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Response
+{
+  "actual": "507f1f77bcf86cd799439011",
+  "seleccionados": [
+    "507f1f77bcf86cd799439011",
+    "507f1f77bcf86cd799439012"
+  ],
+  "sugerencias": [
+    {
+      "id": "507f1f77bcf86cd799439013",
+      "nombre": "Palacio Municipal",
+      "ubicacion": "Plaza de Armas, Centro Histórico",
+      "importancia": "Sede del gobierno local",
+      "anio_construccion": 1780,
+      "funcion": "Administrativo",
+      "coordenadas": {
+        "latitud": -12.0464,
+        "longitud": -77.0428
+      },
+      "multimedia": [
+        "https://storage.example.com/palacio-municipal-1.jpg",
+        "https://storage.example.com/palacio-municipal-2.jpg"
+      ],
+      "distancia_km": 0.15
+    },
+    {
+      "id": "507f1f77bcf86cd799439014",
+      "nombre": "Museo Histórico Regional",
+      "ubicacion": "Calle del Comercio 234",
+      "importancia": "Principal museo de la ciudad",
+      "anio_construccion": 1650,
+      "funcion": "Cultural",
+      "coordenadas": {
+        "latitud": -12.0470,
+        "longitud": -77.0435
+      },
+      "multimedia": [
+        "https://storage.example.com/museo-1.jpg"
+      ],
+      "distancia_km": 0.22
+    },
+    {
+      "id": "507f1f77bcf86cd799439015",
+      "nombre": "Casa de la Cultura",
+      "ubicacion": "Avenida Cultural 567",
+      "importancia": "Centro cultural municipal",
+      "anio_construccion": 1920,
+      "funcion": "Cultural",
+      "coordenadas": {
+        "latitud": -12.0480,
+        "longitud": -77.0440
+      },
+      "multimedia": [],
+      "distancia_km": 0.35
+    }
+  ]
+}
+```
+
+```json Error - Missing actual field
+{
+  "error": "Debes enviar el campo 'actual' en el body"
+}
+```
+
+```json Error - Invalid seleccionados
+{
+  "error": "'seleccionados' debe ser una lista"
+}
+```
+
+</ResponseExample>
+
+## Use Cases
+
+### Interactive Route Builder
+
+```javascript Example: Building a route step by step
+let selectedPOIs = [];
+let currentPOI = null;
+
+// User selects first POI
+currentPOI = "507f1f77bcf86cd799439011";
+selectedPOIs.push(currentPOI);
+
+// Get suggestions for next POI
+const response1 = await fetch('/rutas/sugerencias', {
+  method: 'POST',
+  body: JSON.stringify({
+    actual: currentPOI,
+    seleccionados: selectedPOIs
+  })
+});
+
+const suggestions1 = await response1.json();
+// Display suggestions1.sugerencias to user
+
+// User selects second POI
+currentPOI = suggestions1.sugerencias[0].id;
+selectedPOIs.push(currentPOI);
+
+// Get next suggestions
+const response2 = await fetch('/rutas/sugerencias', {
+  method: 'POST',
+  body: JSON.stringify({
+    actual: currentPOI,
+    seleccionados: selectedPOIs
+  })
+});
+
+// Continue until route is complete...
+```
+
+### Mobile App "Next Stop" Feature
+
+```python Example: Progressive route navigation
+def get_next_suggestions(current_location, visited_pois):
+    response = requests.post(
+        'https://api.tesisrutas.com/rutas/sugerencias',
+        json={
+            'actual': current_location,
+            'seleccionados': visited_pois,
+            'limite': 3  # Show top 3 nearby
+        }
+    )
+    return response.json()['sugerencias']
+
+# User is at POI A, has visited A and B
+suggestions = get_next_suggestions(
+    current_location="POI_A",
+    visited_pois=["POI_A", "POI_B"]
+)
+
+print("Where to go next:")
+for poi in suggestions:
+    print(f"{poi['nombre']} - {poi['distancia_km']} km away")
+```
+
+## Important Notes
+
+- Suggestions are always sorted by **distance** (closest first)
+- Distance is calculated using the Haversine formula (great-circle distance)
+- POIs in `seleccionados` are automatically excluded
+- The `actual` POI can be in the `seleccionados` array
+- Returns empty array if no suggestions available
+- Includes full POI details for immediate display
+
+## Validation
+
+- `actual` field is required (returns error if missing)
+- `seleccionados` must be an array (returns error otherwise)
+- Empty `seleccionados` array is valid for first suggestion
+- Invalid POI IDs are silently ignored
+
+## Performance
+
+- Calculates distances for all active POIs in database
+- Optimized for databases with hundreds of POIs
+- For thousands of POIs, consider caching or spatial indexing

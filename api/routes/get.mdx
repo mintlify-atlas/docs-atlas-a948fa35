@@ -1,0 +1,120 @@
+---
+title: "Get Route"
+api: "GET /rutas/{id}"
+description: "Retrieve a specific tourist route by its ID"
+---
+
+Fetches detailed information about a single tourist route, including all its POIs in the correct order.
+
+## Authentication
+
+No authentication required. This is a public endpoint.
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the route (MongoDB ObjectId)
+</ParamField>
+
+<ResponseField name="_id" type="string">
+  Unique route identifier
+</ResponseField>
+
+<ResponseField name="nombre" type="string">
+  Name of the route
+</ResponseField>
+
+<ResponseField name="descripcion" type="string">
+  Description of the route
+</ResponseField>
+
+<ResponseField name="categoria" type="string">
+  Route category classification
+</ResponseField>
+
+<ResponseField name="puntos" type="array">
+  Ordered array of POI references in the route
+  
+  <ResponseField name="poi_id" type="string">
+    ID of the POI
+  </ResponseField>
+  
+  <ResponseField name="order" type="integer">
+    Position in the route sequence (0-indexed)
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="creado_en" type="string">
+  ISO 8601 timestamp when the route was created
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.tesisrutas.com/rutas/507f1f77bcf86cd799439020
+```
+
+```python Python
+import requests
+
+ruta_id = "507f1f77bcf86cd799439020"
+url = f"https://api.tesisrutas.com/rutas/{ruta_id}"
+
+response = requests.get(url)
+ruta = response.json()
+
+print(f"Ruta: {ruta['nombre']}")
+print(f"Total de POIs: {len(ruta['puntos'])}")
+```
+
+```javascript JavaScript
+const rutaId = '507f1f77bcf86cd799439020';
+const response = await fetch(`https://api.tesisrutas.com/rutas/${rutaId}`);
+const ruta = await response.json();
+
+console.log(`Ruta: ${ruta.nombre}`);
+console.log(`Total de POIs: ${ruta.puntos.length}`);
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "_id": "507f1f77bcf86cd799439020",
+  "nombre": "Ruta Colonial del Centro Histórico",
+  "descripcion": "Recorrido por los principales monumentos coloniales del centro de la ciudad",
+  "categoria": "Cultural",
+  "puntos": [
+    {
+      "poi_id": "507f1f77bcf86cd799439011",
+      "order": 0
+    },
+    {
+      "poi_id": "507f1f77bcf86cd799439012",
+      "order": 1
+    },
+    {
+      "poi_id": "507f1f77bcf86cd799439013",
+      "order": 2
+    },
+    {
+      "poi_id": "507f1f77bcf86cd799439014",
+      "order": 3
+    }
+  ],
+  "creado_en": "2024-03-15T10:30:00Z"
+}
+```
+
+```json 404 Not Found
+{
+  "detail": "Ruta no encontrada"
+}
+```
+
+</ResponseExample>
+
+## Error Responses
+
+- **404 Not Found**: Route with the specified ID does not exist
+- **422 Unprocessable Entity**: Invalid ID format
