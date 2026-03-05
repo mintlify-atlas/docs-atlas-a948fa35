@@ -87,9 +87,12 @@
           {
             "group": "Users",
             "pages": [
+              "api/users/me",
+              "api/users/get-by-id",
               "api/users/list",
               "api/users/update",
               "api/users/delete",
+              "api/users/assign-role",
               "api/users/favorites",
               "api/users/tracking"
             ]

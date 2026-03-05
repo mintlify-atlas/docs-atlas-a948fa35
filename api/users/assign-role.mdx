@@ -1,0 +1,170 @@
+---
+title: "Assign User Role"
+description: "Update a user's role (admin only)"
+---
+
+## PATCH /usuarios/{user_id}/rol
+
+Updates a user's role. This is an admin-only operation for managing user permissions.
+
+### Authentication
+
+<Warning>
+  **Admin Only:** This endpoint requires admin privileges
+</Warning>
+
+Only users with the `admin` role can assign roles to other users.
+
+### Path Parameters
+
+<ParamField path="user_id" type="string" required>
+  The MongoDB ObjectId of the user whose role will be updated
+</ParamField>
+
+### Request Body
+
+<ParamField body="rol" type="string" required>
+  The new role to assign. Must be one of: `visitante`, `editor`, or `admin`
+</ParamField>
+
+### Request
+
+```bash cURL
+curl -X PATCH "http://localhost:8000/usuarios/507f1f77bcf86cd799439011/rol" \
+  -H "Authorization: Bearer ADMIN_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rol": "editor"
+  }'
+```
+
+```python Python
+import requests
+
+user_id = "507f1f77bcf86cd799439011"
+url = f"http://localhost:8000/usuarios/{user_id}/rol"
+headers = {
+    "Authorization": "Bearer ADMIN_JWT_TOKEN",
+    "Content-Type": "application/json"
+}
+data = {
+    "rol": "editor"
+}
+
+response = requests.patch(url, headers=headers, json=data)
+print(response.json())
+```
+
+```javascript JavaScript
+const userId = '507f1f77bcf86cd799439011';
+const response = await fetch(`http://localhost:8000/usuarios/${userId}/rol`, {
+  method: 'PATCH',
+  headers: {
+    'Authorization': 'Bearer ADMIN_JWT_TOKEN',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    rol: 'editor'
+  })
+});
+
+const result = await response.json();
+console.log(result);
+```
+
+### Response
+
+<ResponseField name="message" type="string">
+  Success message confirming the role update
+</ResponseField>
+
+<ResponseField name="user_id" type="string">
+  The ID of the user whose role was updated
+</ResponseField>
+
+<ResponseField name="nuevo_rol" type="string">
+  The newly assigned role
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "message": "Rol actualizado correctamente",
+  "user_id": "507f1f77bcf86cd799439011",
+  "nuevo_rol": "editor"
+}
+```
+
+### Error Responses
+
+| Status Code | Description |
+|-------------|-------------|
+| 400 | Bad Request - Missing `rol` field or invalid role value |
+| 401 | Unauthorized - Invalid or missing JWT token |
+| 403 | Forbidden - User is not an admin |
+| 404 | Not Found - User with given ID does not exist |
+| 500 | Internal Server Error - Database or processing error |
+
+### Valid Role Values
+
+<CardGroup cols={3}>
+  <Card title="visitante" icon="user">
+    Default role for new users. Read-only access to public content.
+  </Card>
+  <Card title="editor" icon="pen-to-square">
+    Can create and edit routes, toggle destination status.
+  </Card>
+  <Card title="admin" icon="user-shield">
+    Full access to all platform features and user management.
+  </Card>
+</CardGroup>
+
+### Implementation Reference
+
+This endpoint is implemented in `src/infrastructure/api/routers/usuario_router.py:202-223`:
+
+```python
+@router.patch("/{user_id}/rol", dependencies=[Depends(require_admin)])
+def asignar_rol(user_id: str, data: dict, db=Depends(get_database)):
+    try:
+        nuevo_rol = data.get("rol")
+        if not nuevo_rol:
+            raise HTTPException(status_code=400, detail="Debes enviar el campo 'rol'.")
+
+        repo = UsuarioRepositoryImpl(db)
+        use_case = AsignarRol(repo)
+        usuario = use_case.ejecutar(user_id, nuevo_rol)
+
+        return {
+            "message": "Rol actualizado correctamente",
+            "user_id": usuario.id,
+            "nuevo_rol": usuario.rol,
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error interno: " + str(e))
+```
+
+The `AsignarRol` use case validates the role value and updates the user document in MongoDB.
+
+## Use Cases
+
+- **Promote user to editor:** Grant content management permissions to trusted users
+- **Promote user to admin:** Give full platform access to administrators
+- **Demote user:** Revoke elevated permissions (e.g., from editor to visitante)
+- **User moderation:** Adjust permissions based on user behavior
+
+<Note>
+  Role changes take effect immediately. The user will need to log in again to receive a JWT token with the updated role.
+</Note>
+
+## Related Documentation
+
+- [User Roles Overview](/roles/overview) - Understand role permissions
+- [Admin Role](/roles/admin) - Admin capabilities
+- [Editor Role](/roles/editor) - Editor capabilities
+- [List Users](/api/users/list) - View all users to manage roles

@@ -1,0 +1,171 @@
+---
+title: "Get User by ID"
+description: "Retrieve a specific user's profile information by their ID"
+---
+
+## GET /usuarios/porid/{user_id}
+
+Returns detailed profile information for a specific user. Users can view their own profile, and admins can view any user's profile.
+
+### Authentication
+
+<Note>
+  **Required:** Bearer token (JWT) in the Authorization header
+</Note>
+
+**Authorization Rules:**
+- Users can view their own profile (`token.id == user_id`)
+- Admins can view any user's profile
+- Other users cannot view profiles they don't own (403 Forbidden)
+
+### Path Parameters
+
+<ParamField path="user_id" type="string" required>
+  The MongoDB ObjectId of the user to retrieve
+</ParamField>
+
+### Request
+
+```bash cURL
+curl -X GET "http://localhost:8000/usuarios/porid/507f1f77bcf86cd799439011" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+```python Python
+import requests
+
+user_id = "507f1f77bcf86cd799439011"
+url = f"http://localhost:8000/usuarios/porid/{user_id}"
+headers = {
+    "Authorization": "Bearer YOUR_JWT_TOKEN"
+}
+
+response = requests.get(url, headers=headers)
+print(response.json())
+```
+
+```javascript JavaScript
+const userId = '507f1f77bcf86cd799439011';
+const response = await fetch(`http://localhost:8000/usuarios/porid/${userId}`, {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer YOUR_JWT_TOKEN'
+  }
+});
+
+const user = await response.json();
+console.log(user);
+```
+
+### Response
+
+<ResponseField name="id" type="string">
+  User's unique identifier
+</ResponseField>
+
+<ResponseField name="nombre" type="string">
+  User's full name
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email address
+</ResponseField>
+
+<ResponseField name="password_hash" type="string">
+  Hashed password (bcrypt)
+</ResponseField>
+
+<ResponseField name="rol" type="string">
+  User's role: `visitante`, `editor`, or `admin`
+</ResponseField>
+
+<ResponseField name="favoritos" type="array">
+  Array of favorite destination IDs (strings)
+</ResponseField>
+
+<ResponseField name="rutas_recorridas" type="array">
+  Array of completed route objects with metadata
+</ResponseField>
+
+<ResponseField name="pois_visitados" type="array">
+  Array of visited POI IDs (strings)
+</ResponseField>
+
+<ResponseField name="fecha_creacion" type="datetime">
+  Account creation timestamp
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "id": "507f1f77bcf86cd799439011",
+  "nombre": "Juan Pérez",
+  "email": "juan.perez@example.com",
+  "password_hash": "$2b$12$KIXxWV8aBcD3fG2hIjKlMNoPqRsTuVwXyZ",
+  "rol": "visitante",
+  "favoritos": [
+    "507f1f77bcf86cd799439012",
+    "507f1f77bcf86cd799439013"
+  ],
+  "rutas_recorridas": [
+    {
+      "ruta_id": "507f1f77bcf86cd799439020",
+      "fecha": "2025-03-01T10:30:00",
+      "duracion_minutos": 120,
+      "calificacion": 5
+    }
+  ],
+  "pois_visitados": [
+    "507f1f77bcf86cd799439012",
+    "507f1f77bcf86cd799439013"
+  ],
+  "fecha_creacion": "2025-01-15T08:00:00"
+}
+```
+
+### Error Responses
+
+| Status Code | Description |
+|-------------|-------------|
+| 401 | Unauthorized - Invalid or missing JWT token |
+| 403 | Forbidden - User cannot access this profile |
+| 404 | Not Found - User with given ID does not exist |
+
+### Implementation Reference
+
+This endpoint is implemented in `src/infrastructure/api/routers/usuario_router.py:89-102`:
+
+```python
+@router.get("/porid/{user_id}")
+def obtener_usuario(user_id: str, db=Depends(get_database), user=Depends(require_user)):
+
+    # El dueño puede ver su info, admin puede ver todo
+    if user.id != user_id and user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    repo = UsuarioRepositoryImpl(db)
+    usuario = repo.obtener_por_id(user_id)
+
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    return usuario.__dict__
+```
+
+## Use Cases
+
+- Admins viewing user details for moderation
+- Users viewing their complete profile including tracking data
+- Fetching user information for analytics or reporting
+- Displaying user activity history
+
+<Warning>
+  The response includes the password hash. In production, consider filtering sensitive fields from the response.
+</Warning>
+
+## Related Documentation
+
+- [Get Current User](/api/users/me) - Simpler endpoint for current user
+- [List Users](/api/users/list) - List all users (admin only)
+- [User Roles](/roles/overview) - Learn about role permissions

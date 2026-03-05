@@ -1,0 +1,116 @@
+---
+title: "Get Current User"
+description: "Retrieve the authenticated user's profile information"
+---
+
+## GET /usuarios/me
+
+Returns the profile information for the currently authenticated user based on the JWT token.
+
+### Authentication
+
+<Note>
+  **Required:** Bearer token (JWT) in the Authorization header
+</Note>
+
+This endpoint requires a valid JWT token. Any authenticated user (visitante, editor, or admin) can access their own profile.
+
+### Request
+
+No request body or parameters required. The user is identified from the JWT token.
+
+```bash cURL
+curl -X GET "http://localhost:8000/usuarios/me" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+```python Python
+import requests
+
+url = "http://localhost:8000/usuarios/me"
+headers = {
+    "Authorization": "Bearer YOUR_JWT_TOKEN"
+}
+
+response = requests.get(url, headers=headers)
+print(response.json())
+```
+
+```javascript JavaScript
+const response = await fetch('http://localhost:8000/usuarios/me', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer YOUR_JWT_TOKEN'
+  }
+});
+
+const user = await response.json();
+console.log(user);
+```
+
+### Response
+
+<ResponseField name="id" type="string">
+  User's unique identifier (MongoDB ObjectId)
+</ResponseField>
+
+<ResponseField name="nombre" type="string">
+  User's full name
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email address
+</ResponseField>
+
+<ResponseField name="rol" type="string">
+  User's role: `visitante`, `editor`, or `admin`
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "id": "507f1f77bcf86cd799439011",
+  "nombre": "Juan Pérez",
+  "email": "juan.perez@example.com",
+  "rol": "visitante"
+}
+```
+
+### Error Responses
+
+| Status Code | Description |
+|-------------|-------------|
+| 401 | Unauthorized - Invalid or missing JWT token |
+| 403 | Forbidden - Token expired or malformed |
+
+### Use Cases
+
+- Display user profile information in the frontend
+- Verify the current user's role before showing role-specific UI
+- Fetch user details after login
+- Check authentication status
+
+### Implementation Reference
+
+This endpoint is implemented in `src/infrastructure/api/routers/usuario_router.py:24-32`:
+
+```python
+@router.get("/me")
+def get_me(token_data = Depends(get_current_user)):
+    """Devuelve los datos del usuario autenticado."""
+    return {
+        "id": token_data.id,
+        "nombre": token_data.nombre,
+        "email": token_data.email,
+        "rol": token_data.rol
+    }
+```
+
+The `get_current_user` dependency (from `jwt_utils.py`) decodes the JWT token and returns the user data.
+
+## Related Documentation
+
+- [Login](/api/auth/login) - Get a JWT token
+- [Update User](/api/users/update) - Update your profile
+- [User Roles](/roles/overview) - Learn about role permissions
