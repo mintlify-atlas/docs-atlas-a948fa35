@@ -1,0 +1,143 @@
+{
+  "projectType": "saas",
+  "projectName": "Tesis Rutas",
+  "projectDescription": "Tourism platform for managing heritage destinations and tourist routes at Universidad Central del Ecuador",
+  "theme": "almond",
+  "primaryColor": "#df2604",
+  "lightColor": "#0e6796",
+  "darkColor": "#beaf61",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "architecture"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/destinations",
+              "features/routes",
+              "features/route-generation",
+              "features/multimedia"
+            ]
+          },
+          {
+            "group": "User Roles",
+            "pages": [
+              "roles/overview",
+              "roles/admin",
+              "roles/editor",
+              "roles/visitor"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/auth/register",
+              "api/auth/login"
+            ]
+          },
+          {
+            "group": "Destinations",
+            "pages": [
+              "api/destinations/create",
+              "api/destinations/list",
+              "api/destinations/update",
+              "api/destinations/delete",
+              "api/destinations/multimedia"
+            ]
+          },
+          {
+            "group": "Routes",
+            "pages": [
+              "api/routes/create",
+              "api/routes/list",
+              "api/routes/get",
+              "api/routes/update",
+              "api/routes/delete",
+              "api/routes/generate",
+              "api/routes/suggestions"
+            ]
+          },
+          {
+            "group": "Users",
+            "pages": [
+              "api/users/list",
+              "api/users/update",
+              "api/users/delete",
+              "api/users/favorites",
+              "api/users/tracking"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Setup",
+            "pages": [
+              "guides/installation",
+              "guides/configuration",
+              "guides/deployment"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "guides/frontend-setup",
+              "guides/backend-setup",
+              "guides/database-setup"
+            ]
+          },
+          {
+            "group": "Integration",
+            "pages": [
+              "guides/cloudinary-setup",
+              "guides/maps-integration",
+              "guides/authentication"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Heritage destination management with rich multimedia support",
+    "AI-powered tourist route generation based on proximity and preferences",
+    "Interactive map-based route planning with Leaflet",
+    "Role-based access control (Admin, Editor, Visitor)",
+    "User tracking for visited POIs and completed routes",
+    "Cloudinary integration for scalable media storage",
+    "Clean Architecture with domain-driven design"
+  ],
+  "publicApiSurface": [
+    "POST /auth/register - Register new user",
+    "POST /auth/login - User authentication",
+    "GET /destinos - List all destinations",
+    "POST /destinos - Create destination (admin only)",
+    "PUT /destinos/{id} - Update destination (admin only)",
+    "DELETE /destinos/{id}/force - Delete destination (admin only)",
+    "POST /destinos/{id}/multimedia - Upload media files (admin only)",
+    "DELETE /destinos/{id}/multimedia - Remove media files (admin only)",
+    "GET /rutas - List all tourist routes",
+    "POST /rutas/crear - Create new route (editor+)",
+    "GET /rutas/{id} - Get route details",
+    "PUT /rutas/{id} - Update route (editor+)",
+    "DELETE /rutas/{id} - Delete route (editor+)",
+    "POST /rutas/generar-desde-poi - Generate route from POI",
+    "POST /rutas/sugerencias - Get POI suggestions for route"
+  ]
+}
